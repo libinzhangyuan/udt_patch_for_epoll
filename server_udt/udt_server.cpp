@@ -39,10 +39,10 @@ int UDTServer::CreateListenSocket(int listen_port)
 
         //UDT::setsockopt(listen_sock_, 0, UDT_MSS, new int(1500), sizeof(int));
 
-        //int snd_buf = 16000;// 8192;  1460 * 64 = 93440
-        //int rcv_buf = 16000;//8192;
-        //UDT::setsockopt(listen_sock_, 0, UDT_SNDBUF, &snd_buf, sizeof(int)); // use default:10MB
-        //UDT::setsockopt(listen_sock_, 0, UDT_RCVBUF, &rcv_buf, sizeof(int)); // use default:10MB
+        int snd_buf = 93440;// 1460 * 64 = 93440
+        int rcv_buf = 93440;
+        UDT::setsockopt(listen_sock_, 0, UDT_SNDBUF, &snd_buf, sizeof(int)); // use default:10MB
+        UDT::setsockopt(listen_sock_, 0, UDT_RCVBUF, &rcv_buf, sizeof(int)); // use default:10MB
 
 
         //int fc = 4096;

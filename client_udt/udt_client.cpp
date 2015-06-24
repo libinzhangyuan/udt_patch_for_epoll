@@ -45,8 +45,10 @@ int UDTClient::CreateSocket(int local_port)
 
         //int snd_buf = 16000;// 8192;
         //int rcv_buf = 16000;//8192;
-        //UDT::setsockopt(sock_, 0, UDT_SNDBUF, &snd_buf, sizeof(int)); // use default:10MB
-        //UDT::setsockopt(sock_, 0, UDT_RCVBUF, &rcv_buf, sizeof(int)); // use default:10MB
+        int snd_buf = 93440;// 1460 * 64 = 93440
+        int rcv_buf = 93440;
+        UDT::setsockopt(sock_, 0, UDT_SNDBUF, &snd_buf, sizeof(int));
+        UDT::setsockopt(sock_, 0, UDT_RCVBUF, &rcv_buf, sizeof(int)); 
 
 
         //int fc = 4096;
