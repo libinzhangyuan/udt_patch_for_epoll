@@ -83,6 +83,10 @@ int UDTClient::SendMsg(const UDTSOCKET& sock, const std::string& msg)
     if (UDT::ERROR == send_ret)
     {
         std::cout << "UDT sendmsg: " << UDT::getlasterror().getErrorCode() << ' ' << UDT::getlasterror().getErrorMessage() << std::endl;
+        if (UDT::getlasterror().getErrorCode() == CUDTException::ECONNLOST)
+        {
+            udt_running_ = 0;
+        }
         return 0;
     }
     if (static_cast<size_t>(send_ret) != msg.size())
@@ -95,6 +99,10 @@ int UDTClient::SendMsg(const UDTSOCKET& sock, const std::string& msg)
 
 int UDTClient::RecvMsg(const UDTSOCKET& sock)
 {
+    static size_t static_good_recv_count = 0;
+    static size_t static_recv_count = 0;
+    static_recv_count++;
+
     udtbuf_recved_len_ = 0;
 
     int recv_ret = 0;
@@ -115,6 +123,19 @@ int UDTClient::RecvMsg(const UDTSOCKET& sock)
         std::string recved_str(udtbuf_, udtbuf_recved_len_);
         if (haha != recved_str)
             std::cout << "UDT recv wrong msg: \n" << recved_str << std::endl << "need: \n" << haha << "\n\n\n\n";
+        else
+        {
+            static_good_recv_count++;
+        }
+
+        if (static_recv_count % 1000 == 0)
+        {
+            std::cout << static_good_recv_count << '\\' << static_recv_count / 1000 << "\t";
+            std::cout.flush();
+            if (static_recv_count % 10000 == 0)
+                std::cout << std::endl;
+        }
+ 
         //DEBUG_MSG(" - UDT Thread Exit.\n");
         return 1;
     }
