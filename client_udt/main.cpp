@@ -11,11 +11,11 @@ int main(int argc, char* argv[])
     try
     {
         // Check command line arguments.
-        if (argc != 3)
+        if (argc != 4)
         {
-            std::cerr << "Usage: battle_client_udt <address> <port>\n";
+            std::cerr << "Usage: battle_client_udt <local_port> <serv_address> <serv_port>\n";
             std::cerr << "  For IPv4, try:\n";
-            std::cerr << "    client_udt 120.123,2.123 80\n";
+            std::cerr << "    client_udt 12345 120.123,2.123 80\n";
             return 1;
         }
     }
@@ -30,6 +30,6 @@ int main(int argc, char* argv[])
 	sigaddset(&ps, SIGPIPE);
 	pthread_sigmask(SIG_BLOCK, &ps, NULL);
 
-    UDTClient client(12346, argv[1], std::atoi(argv[2]));
+    UDTClient client(std::atoi(argv[1]), argv[2], std::atoi(argv[3]));
     return 1;
 }
