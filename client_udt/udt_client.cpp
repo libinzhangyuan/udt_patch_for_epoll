@@ -12,7 +12,7 @@ const int g_IP_Version = AF_INET;
 //const int g_Socket_Type = SOCK_STREAM;
 const int g_Socket_Type = SOCK_DGRAM;
 
-static std::string haha = test_str("haha", 1460 * 10);
+static std::string haha = test_str("haha", 1460 * 1);
 
 UDTClient::UDTClient(int local_port, const std::string& ip_connect_to, int port_connect_to) :
     sock_(UDT::INVALID_SOCK),
