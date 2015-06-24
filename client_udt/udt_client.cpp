@@ -5,11 +5,14 @@
 #include <sys/socket.h>
 
 #include "udt_client.h"
+#include "test_util.h"
+
 
 const int g_IP_Version = AF_INET;
 //const int g_Socket_Type = SOCK_STREAM;
 const int g_Socket_Type = SOCK_DGRAM;
 
+static std::string haha = test_str("haha", 1460 * 10);
 
 UDTClient::UDTClient(int local_port, const std::string& ip_connect_to, int port_connect_to) :
     sock_(UDT::INVALID_SOCK),
@@ -74,7 +77,7 @@ int UDTClient::CreateSocket(int local_port)
 
 int UDTClient::SendMsg(const UDTSOCKET& sock, const std::string& msg)
 {
-    std::cout << "UDT client SendMsg: " << msg << std::endl;
+    //std::cout << "UDT client SendMsg: " << msg << std::endl;
 
     int send_ret = UDT::sendmsg(sock, msg.c_str(), msg.size());
     if (UDT::ERROR == send_ret)
@@ -109,7 +112,9 @@ int UDTClient::RecvMsg(const UDTSOCKET& sock)
     {
         //DEBUG_MSG("UDT Thread Enter.\n");
         udtbuf_recved_len_ = recv_ret;
-        std::cout << "UDT recv msg: " << std::string(udtbuf_, udtbuf_recved_len_) << std::endl;
+        std::string recved_str(udtbuf_, udtbuf_recved_len_);
+        if (haha != recved_str)
+            std::cout << "UDT recv wrong msg: \n" << recved_str << std::endl << "need: \n" << haha << "\n\n\n\n";
         //DEBUG_MSG(" - UDT Thread Exit.\n");
         return 1;
     }
@@ -148,9 +153,8 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
         return 0;
     }
 
-    // send hello world for test.
-    std::string hello = "hello world!\n";
-    if (0 == SendMsg(sock_, hello))
+    // send test string.
+    if (0 == SendMsg(sock_, haha))
     {
         return 0;
     }
@@ -191,7 +195,7 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
 
                 if (cur_sock == sock_)
                 {
-                    SendMsg(cur_sock, "1234567890");
+                    SendMsg(cur_sock, haha);
                     continue;
                 }
                 else

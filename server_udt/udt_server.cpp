@@ -3,7 +3,7 @@
 #include <iostream>
 #include <cstring>
 #include <sys/socket.h>
-
+#include "test_util.h"
 #include "udt_server.h"
 
 const int g_IP_Version = AF_INET;
@@ -39,7 +39,7 @@ int UDTServer::CreateListenSocket(int listen_port)
 
         //UDT::setsockopt(listen_sock_, 0, UDT_MSS, new int(1500), sizeof(int));
 
-        //int snd_buf = 16000;// 8192;
+        //int snd_buf = 16000;// 8192;  1460 * 64 = 93440
         //int rcv_buf = 16000;//8192;
         //UDT::setsockopt(listen_sock_, 0, UDT_SNDBUF, &snd_buf, sizeof(int)); // use default:10MB
         //UDT::setsockopt(listen_sock_, 0, UDT_RCVBUF, &rcv_buf, sizeof(int)); // use default:10MB
@@ -81,7 +81,7 @@ int UDTServer::CreateListenSocket(int listen_port)
 
 int UDTServer::SendMsg(const UDTSOCKET& sock, const std::string& msg)
 {
-    std::cout << "UDT client SendMsg: " << msg << std::endl;
+    //std::cout << "UDT client SendMsg: " << msg << std::endl;
 
     int send_ret = UDT::sendmsg(sock, msg.c_str(), msg.size());
     if (UDT::ERROR == send_ret)
@@ -125,7 +125,10 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock)
     {
         //DEBUG_MSG("UDT Thread Enter.\n");
         udtbuf_recved_len_ = recv_ret;
-        std::cout << "UDT recv msg: " << std::string(udtbuf_, udtbuf_recved_len_) << std::endl;
+        std::string recved_str(udtbuf_, udtbuf_recved_len_);
+        static const std::string haha = test_str("haha", 1460 * 10);
+        if (haha != recved_str)
+            std::cout << "UDT recv wrong msg: \n" << recved_str << std::endl << "need: \n" << haha << "\n\n\n\n";
         //DEBUG_MSG(" - UDT Thread Exit.\n");
         return 1;
     }
@@ -169,7 +172,7 @@ void UDTServer::Run(int listen_port)
 
                 if (cur_sock == listen_sock_)
                 {
-                    std::cout << "cur_sock == listen_sock_" << std::endl;
+                    std::cout << "accept a new connection!" << std::endl;
                     sockaddr addr;
                     int addr_len;
                     UDTSOCKET new_sock = UDT::accept(listen_sock_, &addr, &addr_len);
