@@ -128,11 +128,11 @@ int UDTClient::RecvMsg(const UDTSOCKET& sock)
             static_good_recv_count++;
         }
 
-        if (static_recv_count % 1000 == 0)
+        if (static_recv_count % 100 == 0)
         {
-            std::cout << static_good_recv_count << '\\' << static_recv_count / 1000 << "\t";
+            std::cout << static_good_recv_count << '\\' << static_recv_count / 100 << "\t";
             std::cout.flush();
-            if (static_recv_count % 10000 == 0)
+            if (static_recv_count % 1000 == 0)
                 std::cout << std::endl;
         }
  
