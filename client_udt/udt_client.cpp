@@ -188,12 +188,12 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
 	udt_running_ = 1;
 
 
-    std::set<UDTSOCKET> readfds;
-    std::set<UDTSOCKET> writefds;
 
 
 	while (udt_running_) {
-		int state = UDT::epoll_wait(udt_eid_, &readfds, &writefds, 1, NULL, NULL);
+        std::set<UDTSOCKET> readfds, writefds;
+
+        int state = UDT::epoll_wait(udt_eid_, &readfds, &writefds, 1, NULL, NULL);
 		if (state > 0) {
 			for (std::set<UDTSOCKET>::iterator i = readfds.begin(); i != readfds.end(); ++i)
             {
@@ -201,7 +201,9 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
 
                 if (cur_sock == sock_)
                 {
-                    RecvMsg(cur_sock);
+                    int recv_ret = RecvMsg(cur_sock);
+                    if (recv_ret == 1)
+                        SendMsg(cur_sock, haha);
                     continue;
                 }
                 else
@@ -216,7 +218,7 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
 
                 if (cur_sock == sock_)
                 {
-                    SendMsg(cur_sock, haha);
+                    //SendMsg(cur_sock, haha);
                     continue;
                 }
                 else
