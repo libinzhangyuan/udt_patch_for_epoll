@@ -86,7 +86,13 @@ int UDTServer::SendMsg(const UDTSOCKET& sock, const std::string& msg)
     int send_ret = UDT::sendmsg(sock, msg.c_str(), msg.size());
     if (UDT::ERROR == send_ret)
     {
-        std::cout << "UDT sendmsg:" << UDT::getlasterror().getErrorCode() << ' ' << UDT::getlasterror().getErrorMessage() << std::endl;
+        CUDTException& lasterror = UDT::getlasterror();
+        int error_code = lasterror.getErrorCode();
+        std::cout << "UDT sendmsg:" << error_code << ' ' << lasterror.getErrorMessage() << std::endl;
+        if (error_code == CUDTException::ECONNLOST || error_code == CUDTException::EINVSOCK)
+        {
+            UDT::epoll_remove_usock(udt_eid_, sock);
+        }
         return 0;
     }
     if (static_cast<size_t>(send_ret) != msg.size())
@@ -109,14 +115,14 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock)
     if (UDT::ERROR == (recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_)))) {
 
         CUDTException& lasterror = UDT::getlasterror();
-        std::cout << "UDT recv: " << lasterror.getErrorCode() << " " <<  lasterror.getErrorMessage() << std::endl;
-
         int error_code = lasterror.getErrorCode();
+        std::cout << "UDT recv: " << error_code << " " <<  lasterror.getErrorMessage() << std::endl;
+
         if (error_code == CUDTException::EINVPARAM) {
             udt_running_ = 0;
             UDT::epoll_remove_usock(udt_eid_, sock);
         }
-        else if (error_code == CUDTException::ECONNLOST) {
+        else if (error_code == CUDTException::ECONNLOST || error_code == CUDTException::EINVSOCK) {
             UDT::epoll_remove_usock(udt_eid_, sock);
         }
         else {
