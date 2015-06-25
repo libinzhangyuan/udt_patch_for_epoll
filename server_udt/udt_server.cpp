@@ -32,8 +32,8 @@ int UDTServer::CreateListenSocket(int listen_port)
 
     // setopt
     {
-        bool block = true;  // 设置成阻塞模式, 然后容易保证写的完整性
-        //bool block = false;
+        //bool block = true;  // 设置成阻塞模式, 然后容易保证写的完整性
+        bool block = false;
         UDT::setsockopt(listen_sock_, 0, UDT_SNDSYN, &block, sizeof(bool));
         UDT::setsockopt(listen_sock_, 0, UDT_RCVSYN, &block, sizeof(bool));
 
