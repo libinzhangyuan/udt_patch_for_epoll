@@ -111,11 +111,16 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock)
 
     udtbuf_recved_len_ = 0;
 
-    int recv_ret = 0;
-    if (UDT::ERROR == (recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_)))) {
+    int recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_));
+    if (UDT::ERROR == recv_ret) {
 
         CUDTException& lasterror = UDT::getlasterror();
         int error_code = lasterror.getErrorCode();
+
+        // no data available for read.  try read after next epoll wait.
+        //if (error_code == CUDTException::EASYNCRCV)
+        //    return 1;
+
         std::cout << "UDT recv: " << error_code << " " <<  lasterror.getErrorMessage() << std::endl;
 
         if (error_code == CUDTException::EINVPARAM) {
@@ -168,9 +173,10 @@ void UDTServer::Run(int listen_port)
 
     // epoll
 	udt_eid_ = UDT::epoll_create();
+    int read_event = UDT_EPOLL_IN | UDT_EPOLL_ERR;
 
     {
-        int add_usock_ret = UDT::epoll_add_usock(udt_eid_, listen_sock_);
+        int add_usock_ret = UDT::epoll_add_usock(udt_eid_, listen_sock_, &read_event);
         if (add_usock_ret < 0)
             std::cout << "UDT::epoll_add_usock error: " << add_usock_ret << std::endl;
     }
@@ -179,10 +185,10 @@ void UDTServer::Run(int listen_port)
 	udt_running_ = 1;
 
 
-    std::set<UDTSOCKET> readfds;
 
 
 	while (udt_running_) {
+        std::set<UDTSOCKET> readfds;
 		int state = UDT::epoll_wait(udt_eid_, &readfds, NULL, 1, NULL, NULL);
         //std::cout << "UDT::epoll_wait return " << state << std::endl;
 		if (state > 0) {
@@ -203,7 +209,7 @@ void UDTServer::Run(int listen_port)
 
                     // add to readfds
                     {
-                        int add_usock_ret = UDT::epoll_add_usock(udt_eid_, new_sock);
+                        int add_usock_ret = UDT::epoll_add_usock(udt_eid_, new_sock, &read_event);
                         if (add_usock_ret < 0)
                             std::cout << "UDT::epoll_add_usock new_sock add error: " << add_usock_ret << std::endl;
                     }
