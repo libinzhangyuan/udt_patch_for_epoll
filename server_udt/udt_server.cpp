@@ -3,12 +3,35 @@
 #include <iostream>
 #include <cstring>
 #include <sys/socket.h>
+#include <sys/time.h>
+
+
 #include "test_util.h"
 #include "udt_server.h"
 
 const int g_IP_Version = AF_INET;
 //const int g_Socket_Type = SOCK_STREAM;
 const int g_Socket_Type = SOCK_DGRAM;
+
+/* get system time */
+static inline void itimeofday(long *sec, long *usec)
+{
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    if (sec) *sec = time.tv_sec;
+    if (usec) *usec = time.tv_usec;
+}
+
+/* get clock in millisecond 64 */
+static inline uint64_t iclock64(void)
+{
+    long s, u;
+    uint64_t value;
+    itimeofday(&s, &u);
+    value = ((uint64_t)s) * 1000 + (u / 1000);
+    return value;
+}
+
 
 
 UDTServer::UDTServer(void) :
@@ -111,7 +134,11 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock)
 
     udtbuf_recved_len_ = 0;
 
+    uint64_t begin_time = iclock64();
     int recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_));
+    uint64_t end_time = iclock64();
+    if ((end_time - begin_time) > 200)
+        std::cout << "\nrecv block:" << end_time - begin_time << std::endl;
     if (UDT::ERROR == recv_ret) {
 
         CUDTException& lasterror = UDT::getlasterror();
@@ -128,6 +155,7 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock)
             UDT::epoll_remove_usock(udt_eid_, sock);
         }
         else if (error_code == CUDTException::ECONNLOST || error_code == CUDTException::EINVSOCK) {
+            std::cout << "\nepoll_remove_usock" << std::endl;
             UDT::epoll_remove_usock(udt_eid_, sock);
         }
         else {
