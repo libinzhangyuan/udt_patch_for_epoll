@@ -1,12 +1,14 @@
 #ifndef __UDT_CLIENT_H_
 #define __UDT_CLIENT_H_
 
+#include <vector>
+
 typedef int UDTSOCKET;
 
 class UDTClient
 {
 public:
-    UDTClient(int local_port, const std::string& ip_connect_to, int port_connect_to);
+    UDTClient(int local_port, const std::string& ip_connect_to, int port_connect_to, size_t test_str_size);
     //void SendMsg(const std::string& msg);
 
 private:
@@ -22,6 +24,10 @@ private:
     size_t udtbuf_recved_len_;
     int udt_running_;
     int udt_eid_;
+
+    static std::string test_str_;
+    std::vector<uint64_t> recv_package_times_; // record the time of recving package for ttl testing.
+    std::vector<uint64_t> recv_package_interval_;
 };
 
 #endif

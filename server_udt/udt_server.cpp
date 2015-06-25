@@ -10,7 +10,6 @@ const int g_IP_Version = AF_INET;
 //const int g_Socket_Type = SOCK_STREAM;
 const int g_Socket_Type = SOCK_DGRAM;
 
-static std::string haha = test_str("haha", 1460 * 1);
 
 UDTServer::UDTServer(void) :
     listen_sock_(UDT::INVALID_SOCK),
@@ -130,20 +129,18 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock)
     {
         //DEBUG_MSG("UDT Thread Enter.\n");
         udtbuf_recved_len_ = recv_ret;
-        std::string recved_str(udtbuf_, udtbuf_recved_len_);
-        if (haha != recved_str)
-            std::cout << "UDT recv wrong msg: \n" << "\n\n\n\n";
-        else
+
+
+        // log
         {
             static_good_recv_count++;
-        }
-
-        if (static_recv_count % 10 == 0)
-        {
-            std::cout << static_good_recv_count << '\\' << static_recv_count / 10 << "\t";
-            std::cout.flush();
-            if (static_recv_count % 100 == 0)
-                std::cout << std::endl;
+            if (static_recv_count % 10 == 0)
+            {
+                std::cout << static_good_recv_count << '\\' << static_recv_count / 10 << "\t";
+                std::cout.flush();
+                if (static_recv_count % 100 == 0)
+                    std::cout << std::endl;
+            }
         }
         //DEBUG_MSG(" - UDT Thread Exit.\n");
         return 1;

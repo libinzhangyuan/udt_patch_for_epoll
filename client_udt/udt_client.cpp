@@ -3,6 +3,8 @@
 #include <iostream>
 #include <cstring>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <algorithm>
 
 #include "udt_client.h"
 #include "test_util.h"
@@ -12,14 +14,35 @@ const int g_IP_Version = AF_INET;
 //const int g_Socket_Type = SOCK_STREAM;
 const int g_Socket_Type = SOCK_DGRAM;
 
-static std::string haha = test_str("haha", 1460 * 1);
 
-UDTClient::UDTClient(int local_port, const std::string& ip_connect_to, int port_connect_to) :
+
+/* get system time */
+static inline void itimeofday(long *sec, long *usec)
+{
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    if (sec) *sec = time.tv_sec;
+    if (usec) *usec = time.tv_usec;
+}
+
+/* get clock in millisecond 64 */
+static inline uint64_t iclock64(void)
+{
+    long s, u;
+    uint64_t value;
+    itimeofday(&s, &u);
+    value = ((uint64_t)s) * 1000 + (u / 1000);
+    return value;
+}
+
+std::string UDTClient::test_str_;
+UDTClient::UDTClient(int local_port, const std::string& ip_connect_to, int port_connect_to, size_t test_str_size) :
     sock_(UDT::INVALID_SOCK),
     udtbuf_recved_len_(0),
     udt_running_(0),
     udt_eid_(-1)
 {
+    test_str_ = test_str("haha", test_str_size);
     Run(local_port, ip_connect_to, port_connect_to);
 }
 
@@ -123,21 +146,31 @@ int UDTClient::RecvMsg(const UDTSOCKET& sock)
         //DEBUG_MSG("UDT Thread Enter.\n");
         udtbuf_recved_len_ = recv_ret;
         std::string recved_str(udtbuf_, udtbuf_recved_len_);
-        if (haha != recved_str)
-            std::cout << "UDT recv wrong msg: \n" << recved_str << std::endl << "need: \n" << haha << "\n\n\n\n";
+        if (test_str_ != recved_str)
+            std::cout << "UDT recv wrong msg: \n" << recved_str << std::endl << "need: \n" << test_str_ << "\n\n\n\n";
         else
         {
             static_good_recv_count++;
+            recv_package_times_.push_back(iclock64());
         }
 
-        if (static_recv_count % 10 == 0)
         {
-            std::cout << static_good_recv_count << '\\' << static_recv_count / 10 << "\t";
+            size_t last_index = recv_package_times_.size() - 1;
+            uint64_t interval = recv_package_times_[last_index] - recv_package_times_[last_index - 1];
+            recv_package_interval_.push_back(interval);
+            std::cout << interval << "\t";
+
+            if (static_good_recv_count % 10 == 0)
+            {
+                std::cout << "max: " << *std::max_element( recv_package_interval_.begin(), recv_package_interval_.end() ) <<
+                    "  average 10: " << (recv_package_times_[last_index] - recv_package_times_[last_index - 10]) / 10 <<
+                    "  average total: " << (recv_package_times_[last_index] - recv_package_times_[0]) / (recv_package_times_.size() - 1) <<
+                    std::endl;
+                recv_package_interval_.clear();
+            }
             std::cout.flush();
-            if (static_recv_count % 100 == 0)
-                std::cout << std::endl;
         }
- 
+
         //DEBUG_MSG(" - UDT Thread Exit.\n");
         return 1;
     }
@@ -176,8 +209,10 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
         return 0;
     }
 
+    recv_package_times_.push_back(iclock64());
+
     // send test string.
-    if (0 == SendMsg(sock_, haha))
+    if (0 == SendMsg(sock_, test_str_))
     {
         return 0;
     }
@@ -187,6 +222,7 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
 	UDT::epoll_add_usock(udt_eid_, sock_);
 	
 	std::cout << "Run UDT client loop ...\n";
+    std::cout << "package size: " << test_str_.size() << std::endl;
 	udt_running_ = 1;
 
 
@@ -205,7 +241,7 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
                 {
                     int recv_ret = RecvMsg(cur_sock);
                     if (recv_ret == 1)
-                        SendMsg(cur_sock, haha);
+                        SendMsg(cur_sock, test_str_);
                     continue;
                 }
                 else
@@ -220,7 +256,7 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
 
                 if (cur_sock == sock_)
                 {
-                    //SendMsg(cur_sock, haha);
+                    //SendMsg(cur_sock, test_str_);
                     continue;
                 }
                 else
