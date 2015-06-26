@@ -137,7 +137,7 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock, int count_of_event)
     uint64_t begin_time = iclock64();
     int recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_));
     uint64_t end_time = iclock64();
-    if ((end_time - begin_time) > 200)
+    if ((end_time - begin_time) > 10)
         std::cout << "\nrecv block:" << end_time - begin_time << std::endl;
     if (UDT::ERROR == recv_ret) {
 
@@ -146,7 +146,7 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock, int count_of_event)
 
         // no data available for read.  try read after next epoll wait.
         if (error_code == CUDTException::EASYNCRCV)
-            return 1;
+            return 0;
 
         std::cout << "UDT recv: " << error_code << " " <<  lasterror.getErrorMessage() << std::endl;
 
@@ -247,11 +247,15 @@ void UDTServer::Run(int listen_port)
 
                 // client sock
                 {
-                    RecvMsg(cur_sock, state);
-                    if (udtbuf_recved_len_ > 0)
+                    int recv_ret = 0;
+                    do
                     {
-                        SendMsg(cur_sock, std::string(udtbuf_, udtbuf_recved_len_));
-                    }
+                        recv_ret = RecvMsg(cur_sock, state);
+                        if (udtbuf_recved_len_ > 0)
+                        {
+                            SendMsg(cur_sock, std::string(udtbuf_, udtbuf_recved_len_));
+                        }
+                    } while (recv_ret == 1);
                 }
 			}
 		}
