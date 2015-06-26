@@ -10,7 +10,12 @@ public:
 private:
     int CreateListenSocket(int port);
     int SendMsg(const UDTSOCKET& sock, const std::string& msg);
-    int RecvMsg(const UDTSOCKET& sock, int count_of_event);
+
+    // return 1 means recv a package.
+    //   at this situation:   bHaveMsgStill == true, means have another package need recv.
+    //                        bHaveMsgStill == false means do not have another package need recv.
+    // return 0 means do not recv a package.
+    int RecvMsg(const UDTSOCKET& sock, int count_of_event, bool& bHaveMsgStill);
 
 private:
     UDTSOCKET listen_sock_;

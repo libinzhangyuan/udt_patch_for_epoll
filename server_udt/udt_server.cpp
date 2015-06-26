@@ -126,16 +126,17 @@ int UDTServer::SendMsg(const UDTSOCKET& sock, const std::string& msg)
     return 1;
 }
 
-int UDTServer::RecvMsg(const UDTSOCKET& sock, int count_of_event)
+int UDTServer::RecvMsg(const UDTSOCKET& sock, int count_of_event, bool& bHaveMsgStill)
 {
     static size_t static_good_recv_count = 0;
     static size_t static_recv_count = 0;
     static_recv_count++;
 
     udtbuf_recved_len_ = 0;
+    bHaveMsgStill = false;
 
     uint64_t begin_time = iclock64();
-    int recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_));
+    int recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_), &bHaveMsgStill);
     uint64_t end_time = iclock64();
     if ((end_time - begin_time) > 10)
         std::cout << "\nrecv block:" << end_time - begin_time << std::endl;
@@ -247,15 +248,16 @@ void UDTServer::Run(int listen_port)
 
                 // client sock
                 {
-                    int recv_ret = 0;
+                    bool bHaveMsgStill = false;
                     do
                     {
-                        recv_ret = RecvMsg(cur_sock, state);
+                        bHaveMsgStill = false;
+                        RecvMsg(cur_sock, state, bHaveMsgStill);
                         if (udtbuf_recved_len_ > 0)
                         {
                             SendMsg(cur_sock, std::string(udtbuf_, udtbuf_recved_len_));
                         }
-                    } while (recv_ret == 1);
+                    } while (bHaveMsgStill);
                 }
 			}
 		}
