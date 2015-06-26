@@ -35,7 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*****************************************************************************
 written by
-   Yunhong Gu, last updated 02/21/2013
+   Yunhong Gu, last updated 03/17/2011
 *****************************************************************************/
 
 
@@ -70,17 +70,20 @@ CCC::~CCC()
    delete [] m_pcParam;
 }
 
-void CCC::setACKTimer(int msINT)
+void CCC::setACKTimer(const int& msINT)
 {
-   m_iACKPeriod = msINT > m_iSYNInterval ? m_iSYNInterval : msINT;
+   m_iACKPeriod = msINT;
+
+   if (m_iACKPeriod > m_iSYNInterval)
+      m_iACKPeriod = m_iSYNInterval;
 }
 
-void CCC::setACKInterval(int pktINT)
+void CCC::setACKInterval(const int& pktINT)
 {
    m_iACKInterval = pktINT;
 }
 
-void CCC::setRTO(int usRTO)
+void CCC::setRTO(const int& usRTO)
 {
    m_bUserDefinedRTO = true;
    m_iRTO = usRTO;
@@ -113,37 +116,37 @@ const CPerfMon* CCC::getPerfInfo()
    return &m_PerfInfo;
 }
 
-void CCC::setMSS(int mss)
+void CCC::setMSS(const int& mss)
 {
    m_iMSS = mss;
 }
 
-void CCC::setBandwidth(int bw)
+void CCC::setBandwidth(const int& bw)
 {
    m_iBandwidth = bw;
 }
 
-void CCC::setSndCurrSeqNo(int32_t seqno)
+void CCC::setSndCurrSeqNo(const int32_t& seqno)
 {
    m_iSndCurrSeqNo = seqno;
 }
 
-void CCC::setRcvRate(int rcvrate)
+void CCC::setRcvRate(const int& rcvrate)
 {
    m_iRcvRate = rcvrate;
 }
 
-void CCC::setMaxCWndSize(int cwnd)
+void CCC::setMaxCWndSize(const int& cwnd)
 {
    m_dMaxCWndSize = cwnd;
 }
 
-void CCC::setRTT(int rtt)
+void CCC::setRTT(const int& rtt)
 {
    m_iRTT = rtt;
 }
 
-void CCC::setUserParam(const char* param, int size)
+void CCC::setUserParam(const char* param, const int& size)
 {
    delete [] m_pcParam;
    m_pcParam = new char[size];
@@ -186,15 +189,10 @@ void CUDTCC::init()
    m_dPktSndPeriod = 1;
 }
 
-void CUDTCC::onACK(int32_t ack)
+void CUDTCC::onACK(const int32_t& ack)
 {
    int64_t B = 0;
    double inc = 0;
-   // Note: 1/24/2012
-   // The minimum increase parameter is increased from "1.0 / m_iMSS" to 0.01
-   // because the original was too small and caused sending rate to stay at low level
-   // for long time.
-   const double min_inc = 0.01;
 
    uint64_t currtime = CTimer::getTime();
    if (currtime - m_LastRCTime < (uint64_t)m_iRCInterval)
@@ -213,7 +211,7 @@ void CUDTCC::onACK(int32_t ack)
          if (m_iRcvRate > 0)
             m_dPktSndPeriod = 1000000.0 / m_iRcvRate;
          else
-            m_dPktSndPeriod = (m_iRTT + m_iRCInterval) / m_dCWndSize;
+            m_dPktSndPeriod = m_dCWndSize / (m_iRTT + m_iRCInterval);
       }
    }
    else
@@ -221,19 +219,19 @@ void CUDTCC::onACK(int32_t ack)
 
    // During Slow Start, no rate increase
    if (m_bSlowStart)
-      return;
+      goto RATE_LIMIT;
 
    if (m_bLoss)
    {
       m_bLoss = false;
-      return;
+      goto RATE_LIMIT;
    }
 
    B = (int64_t)(m_iBandwidth - 1000000.0 / m_dPktSndPeriod);
    if ((m_dPktSndPeriod > m_dLastDecPeriod) && ((m_iBandwidth / 9) < B))
       B = m_iBandwidth / 9;
    if (B <= 0)
-      inc = min_inc;
+      inc = 1.0 / m_iMSS;
    else
    {
       // inc = max(10 ^ ceil(log10( B * MSS * 8 ) * Beta / MSS, 1/MSS)
@@ -241,29 +239,37 @@ void CUDTCC::onACK(int32_t ack)
 
       inc = pow(10.0, ceil(log10(B * m_iMSS * 8.0))) * 0.0000015 / m_iMSS;
 
-      if (inc < min_inc)
-         inc = min_inc;
+      if (inc < 1.0/m_iMSS)
+         inc = 1.0/m_iMSS;
    }
 
    m_dPktSndPeriod = (m_dPktSndPeriod * m_iRCInterval) / (m_dPktSndPeriod * inc + m_iRCInterval);
+
+
+RATE_LIMIT:
+   //set maximum transfer rate
+   if ((NULL != m_pcParam) && (m_iPSize == 8))
+   {
+      int64_t maxSR = *(int64_t*)m_pcParam;
+      if (maxSR <= 0)
+         return;
+
+      double minSP = 1000000.0 / (double(maxSR) / m_iMSS);
+      if (m_dPktSndPeriod < minSP)
+         m_dPktSndPeriod = minSP;
+   }
 }
 
-void CUDTCC::onLoss(const int32_t* losslist, int)
+void CUDTCC::onLoss(const int32_t* losslist, const int&)
 {
    //Slow Start stopped, if it hasn't yet
    if (m_bSlowStart)
    {
       m_bSlowStart = false;
       if (m_iRcvRate > 0)
-      {
-         // Set the sending rate to the receiving rate.
          m_dPktSndPeriod = 1000000.0 / m_iRcvRate;
-         return;
-      }
-      // If no receiving rate is observed, we have to compute the sending
-      // rate according to the current window size, and decrease it
-      // using the method below.
-      m_dPktSndPeriod = m_dCWndSize / (m_iRTT + m_iRCInterval);
+      else
+         m_dPktSndPeriod = m_dCWndSize / (m_iRTT + m_iRCInterval);
    }
 
    m_bLoss = true;

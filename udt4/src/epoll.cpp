@@ -117,7 +117,6 @@ int CEPoll::add_ssock(const int eid, const SYSSOCKET& s, const int* events)
 
 #ifdef LINUX
    epoll_event ev;
-   memset(&ev, 0, sizeof(epoll_event));
 
    if (NULL == events)
       ev.events = EPOLLIN | EPOLLOUT | EPOLLERR;
@@ -132,8 +131,9 @@ int CEPoll::add_ssock(const int eid, const SYSSOCKET& s, const int* events)
          ev.events |= EPOLLERR;
    }
 
+    ev.events |= EPOLLET;
    ev.data.fd = s;
-   if (::epoll_ctl(p->second.m_iLocalID, EPOLL_CTL_ADD, s, &ev) < 0)
+   if (epoll_ctl(p->second.m_iLocalID, EPOLL_CTL_ADD, s, &ev) < 0)
       throw CUDTException();
 #endif
 
@@ -152,7 +152,10 @@ int CEPoll::remove_usock(const int eid, const UDTSOCKET& u)
 
    p->second.m_sUDTSocksIn.erase(u);
    p->second.m_sUDTSocksOut.erase(u);
-   p->second.m_sUDTSocksEx.erase(u);
+
+   // when the socket is removed from a monitoring, it is not available anymore for any IO notification
+   p->second.m_sUDTReads.erase(u);
+   p->second.m_sUDTWrites.erase(u);
 
    return 0;
 }
@@ -167,7 +170,7 @@ int CEPoll::remove_ssock(const int eid, const SYSSOCKET& s)
 
 #ifdef LINUX
    epoll_event ev;  // ev is ignored, for compatibility with old Linux kernel only.
-   if (::epoll_ctl(p->second.m_iLocalID, EPOLL_CTL_DEL, s, &ev) < 0)
+   if (epoll_ctl(p->second.m_iLocalID, EPOLL_CTL_DEL, s, &ev) < 0)
       throw CUDTException();
 #endif
 
@@ -209,20 +212,16 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          throw CUDTException(5, 3);
       }
 
-      // Sockets with exceptions are returned to both read and write sets.
-      if ((NULL != readfds) && (!p->second.m_sUDTReads.empty() || !p->second.m_sUDTExcepts.empty()))
+      if ((NULL != readfds) && !p->second.m_sUDTReads.empty())
       {
          *readfds = p->second.m_sUDTReads;
-         for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
-            readfds->insert(*i);
-         total += p->second.m_sUDTReads.size() + p->second.m_sUDTExcepts.size();
+         total += p->second.m_sUDTReads.size();
       }
-      if ((NULL != writefds) && (!p->second.m_sUDTWrites.empty() || !p->second.m_sUDTExcepts.empty()))
+
+      if ((NULL != writefds) && !p->second.m_sUDTWrites.empty())
       {
          *writefds = p->second.m_sUDTWrites;
-         for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
-            writefds->insert(*i);
-         total += p->second.m_sUDTWrites.size() + p->second.m_sUDTExcepts.size();
+         total += p->second.m_sUDTWrites.size();
       }
 
       if (lrfds || lwfds)
@@ -230,7 +229,7 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          #ifdef LINUX
          const int max_events = p->second.m_sLocals.size();
          epoll_event ev[max_events];
-         int nfds = ::epoll_wait(p->second.m_iLocalID, ev, max_events, 0);
+         int nfds = epoll_wait(p->second.m_iLocalID, ev, max_events, 0);
 
          for (int i = 0; i < nfds; ++ i)
          {
@@ -267,7 +266,7 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          timeval tv;
          tv.tv_sec = 0;
          tv.tv_usec = 0;
-         if (::select(0, &readfds, &writefds, NULL, &tv) > 0)
+         if (select(0, &readfds, &writefds, NULL, &tv) > 0)
          {
             for (set<SYSSOCKET>::const_iterator i = p->second.m_sLocals.begin(); i != p->second.m_sLocals.end(); ++ i)
             {
@@ -292,7 +291,7 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
          return total;
 
       if ((msTimeOut >= 0) && (int64_t(CTimer::getTime() - entertime) >= msTimeOut * 1000LL))
-         throw CUDTException(6, 3, 0);
+         break;
 
       CTimer::waitForEvent();
    }
@@ -318,24 +317,59 @@ int CEPoll::release(const int eid)
    return 0;
 }
 
-namespace
+int CEPoll::enable_write(const UDTSOCKET& uid, set<int>& eids)
 {
+   CGuard pg(m_EPollLock);
 
-void update_epoll_sets(const UDTSOCKET& uid, const set<UDTSOCKET>& watch, set<UDTSOCKET>& result, bool enable)
-{
-   if (enable && (watch.find(uid) != watch.end()))
+   map<int, CEPollDesc>::iterator p;
+
+   vector<int> lost;
+   for (set<int>::iterator i = eids.begin(); i != eids.end(); ++ i)
    {
-      result.insert(uid);
+      p = m_mPolls.find(*i);
+      if (p == m_mPolls.end())
+      {
+         lost.push_back(*i);
+      }
+      else if (p->second.m_sUDTSocksOut.find(uid) != p->second.m_sUDTSocksOut.end())
+      {
+         p->second.m_sUDTWrites.insert(uid);
+      }
    }
-   else if (!enable)
-   {
-      result.erase(uid);
-   }
+
+   for (vector<int>::iterator i = lost.begin(); i != lost.end(); ++ i)
+      eids.erase(*i);
+
+   return 0;
 }
 
-}  // namespace
+int CEPoll::enable_read(const UDTSOCKET& uid, set<int>& eids)
+{
+   CGuard pg(m_EPollLock);
 
-int CEPoll::update_events(const UDTSOCKET& uid, std::set<int>& eids, int events, bool enable)
+   map<int, CEPollDesc>::iterator p;
+
+   vector<int> lost;
+   for (set<int>::iterator i = eids.begin(); i != eids.end(); ++ i)
+   {
+      p = m_mPolls.find(*i);
+      if (p == m_mPolls.end())
+      {
+         lost.push_back(*i);
+      }
+      else if (p->second.m_sUDTSocksIn.find(uid) != p->second.m_sUDTSocksIn.end())
+      {
+         p->second.m_sUDTReads.insert(uid);
+      }
+   }
+
+   for (vector<int>::iterator i = lost.begin(); i != lost.end(); ++ i)
+      eids.erase(*i);
+
+   return 0;
+}
+
+int CEPoll::disable_write(const UDTSOCKET& uid, set<int>& eids)
 {
    CGuard pg(m_EPollLock);
 
@@ -351,12 +385,33 @@ int CEPoll::update_events(const UDTSOCKET& uid, std::set<int>& eids, int events,
       }
       else
       {
-         if ((events & UDT_EPOLL_IN) != 0)
-            update_epoll_sets(uid, p->second.m_sUDTSocksIn, p->second.m_sUDTReads, enable);
-         if ((events & UDT_EPOLL_OUT) != 0)
-            update_epoll_sets(uid, p->second.m_sUDTSocksOut, p->second.m_sUDTWrites, enable);
-         if ((events & UDT_EPOLL_ERR) != 0)
-            update_epoll_sets(uid, p->second.m_sUDTSocksEx, p->second.m_sUDTExcepts, enable);
+         p->second.m_sUDTWrites.erase(uid);
+      }
+   }
+
+   for (vector<int>::iterator i = lost.begin(); i != lost.end(); ++ i)
+      eids.erase(*i);
+
+   return 0;
+}
+
+int CEPoll::disable_read(const UDTSOCKET& uid, set<int>& eids)
+{
+   CGuard pg(m_EPollLock);
+
+   map<int, CEPollDesc>::iterator p;
+
+   vector<int> lost;
+   for (set<int>::iterator i = eids.begin(); i != eids.end(); ++ i)
+   {
+      p = m_mPolls.find(*i);
+      if (p == m_mPolls.end())
+      {
+         lost.push_back(*i);
+      }
+      else
+      {
+         p->second.m_sUDTReads.erase(uid);
       }
    }
 

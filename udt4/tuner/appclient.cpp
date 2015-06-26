@@ -22,9 +22,9 @@ DWORD WINAPI monitor(LPVOID);
 
 int main(int argc, char* argv[])
 {
-   if ((3 != argc) || (0 == atoi(argv[2])))
+   if (argc != 8)
    {
-      cout << "usage: appclient server_ip server_port" << endl;
+      cout << "usage: appclient server_ip server_port use_blast(0 or 1) udt_sendbuff udp_sendbuff mss" << endl;
       return 0;
    }
 
@@ -48,11 +48,20 @@ int main(int argc, char* argv[])
 
    UDTSOCKET client = UDT::socket(local->ai_family, local->ai_socktype, local->ai_protocol);
 
+    int blast = atoi(argv[3]);
+    int udt_sendbuff = atoi(argv[4]);
+    int udp_sendbuff = atoi(argv[5]);
+    int mss = atoi(argv[6]);
+    int blast_rate = atoi(argv[7]);
+
+
    // UDT Options
-   //UDT::setsockopt(client, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
-   //UDT::setsockopt(client, 0, UDT_MSS, new int(9000), sizeof(int));
-   //UDT::setsockopt(client, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
-   //UDT::setsockopt(client, 0, UDP_SNDBUF, new int(10000000), sizeof(int));
+   if (blast)
+    UDT::setsockopt(client, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
+
+   UDT::setsockopt(client, 0, UDT_MSS, &mss, sizeof(int));
+   UDT::setsockopt(client, 0, UDT_SNDBUF, &udt_sendbuff, sizeof(int));
+   UDT::setsockopt(client, 0, UDP_SNDBUF, &udp_sendbuff, sizeof(int));
 
    // Windows UDP issue
    // For better performance, modify HKLM\System\CurrentControlSet\Services\Afd\Parameters\FastSendDatagramThreshold
@@ -88,13 +97,15 @@ int main(int argc, char* argv[])
    freeaddrinfo(peer);
 
    // using CC method
-   //CUDPBlast* cchandle = NULL;
-   //int temp;
-   //UDT::getsockopt(client, 0, UDT_CC, &cchandle, &temp);
-   //if (NULL != cchandle)
-   //   cchandle->setRate(500);
+   if (blast) {
+       CUDPBlast* cchandle = NULL;
+       int temp;
+       UDT::getsockopt(client, 0, UDT_CC, &cchandle, &temp);
+       if (NULL != cchandle)
+          cchandle->setRate(blast_rate);
+    }
 
-   int size = 100000;
+   int size = udt_sendbuff;
    char* data = new char[size];
 
    #ifndef WIN32
@@ -158,11 +169,11 @@ DWORD WINAPI monitor(LPVOID s)
          break;
       }
 
-      cout << perf.mbpsSendRate << "\t\t" 
-           << perf.msRTT << "\t" 
-           << perf.pktCongestionWindow << "\t" 
-           << perf.usPktSndPeriod << "\t\t\t" 
-           << perf.pktRecvACK << "\t" 
+      cout << perf.mbpsSendRate << "\t\t"
+           << perf.msRTT << "\t"
+           << perf.pktCongestionWindow << "\t"
+           << perf.usPktSndPeriod << "\t\t\t"
+           << perf.pktRecvACK << "\t"
            << perf.pktRecvNAK << endl;
    }
 

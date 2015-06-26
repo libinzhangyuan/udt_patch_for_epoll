@@ -20,12 +20,13 @@ void* recvdata(void*);
 DWORD WINAPI recvdata(LPVOID);
 #endif
 
+int buffer_size;
 
 int main(int argc, char* argv[])
 {
-   if ((1 != argc) && ((2 != argc) || (0 == atoi(argv[1]))))
-   {
-      cout << "usage: appserver [server_port]" << endl;
+   if (argc != 6) {
+      cout << "usage: appserver server_port use_blast(0 or 1) udt_recvbuff "
+        "udp_recvbuff mss" << endl;
       return 0;
    }
 
@@ -43,7 +44,7 @@ int main(int argc, char* argv[])
    //hints.ai_socktype = SOCK_DGRAM;
 
    string service("9000");
-   if (2 == argc)
+   if (2 <= argc)
       service = argv[1];
 
    if (0 != getaddrinfo(NULL, service.c_str(), &hints, &res))
@@ -54,11 +55,20 @@ int main(int argc, char* argv[])
 
    UDTSOCKET serv = UDT::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
+    int blast = atoi(argv[2]);
+    int udt_recvbuff = atoi(argv[3]);
+    int udp_recvbuff = atoi(argv[4]);
+    int mss = atoi(argv[5]);
+    buffer_size = udt_recvbuff;
+
+
    // UDT Options
-   //UDT::setsockopt(serv, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
-   //UDT::setsockopt(serv, 0, UDT_MSS, new int(9000), sizeof(int));
-   //UDT::setsockopt(serv, 0, UDT_RCVBUF, new int(10000000), sizeof(int));
-   //UDT::setsockopt(serv, 0, UDP_RCVBUF, new int(10000000), sizeof(int));
+    if (blast)
+        UDT::setsockopt(serv, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
+
+   UDT::setsockopt(serv, 0, UDT_MSS, &mss, sizeof(int));
+   UDT::setsockopt(serv, 0, UDT_RCVBUF, &udt_recvbuff, sizeof(int));
+   UDT::setsockopt(serv, 0, UDP_RCVBUF, &udp_recvbuff, sizeof(int));
 
    if (UDT::ERROR == UDT::bind(serv, res->ai_addr, res->ai_addrlen))
    {
@@ -121,7 +131,7 @@ DWORD WINAPI recvdata(LPVOID usocket)
    delete (UDTSOCKET*)usocket;
 
    char* data;
-   int size = 100000;
+   int size = buffer_size;
    data = new char[size];
 
    while (true)

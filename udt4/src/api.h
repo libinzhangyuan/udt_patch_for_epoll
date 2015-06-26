@@ -130,7 +130,7 @@ public:
       // Returned value:
       //    The new UDT socket ID, or INVALID_SOCK.
 
-   UDTSOCKET newSocket(int af, int type);
+   UDTSOCKET newSocket(const int& af, const int& type);
 
       // Functionality:
       //    Create a new UDT connection.
@@ -163,11 +163,11 @@ public:
 
       // socket APIs
 
-   int bind(const UDTSOCKET u, const sockaddr* name, int namelen);
+   int bind(const UDTSOCKET u, const sockaddr* name, const int& namelen);
    int bind(const UDTSOCKET u, UDPSOCKET udpsock);
-   int listen(const UDTSOCKET u, int backlog);
+   int listen(const UDTSOCKET u, const int& backlog);
    UDTSOCKET accept(const UDTSOCKET listen, sockaddr* addr, int* addrlen);
-   int connect(const UDTSOCKET u, const sockaddr* name, int namelen);
+   int connect(const UDTSOCKET u, const sockaddr* name, const int& namelen);
    int close(const UDTSOCKET u);
    int getpeername(const UDTSOCKET u, sockaddr* name, int* namelen);
    int getsockname(const UDTSOCKET u, sockaddr* name, int* namelen);
@@ -200,9 +200,6 @@ public:
    CUDTException* getError();
 
 private:
-//   void init();
-
-private:
    std::map<UDTSOCKET, CUDTSocket*> m_Sockets;       // stores all the socket structures
 
    pthread_mutex_t m_ControlLock;                    // used to synchronize UDT API
@@ -225,7 +222,7 @@ private:
 private:
    void connect_complete(const UDTSOCKET u);
    CUDTSocket* locate(const UDTSOCKET u);
-   CUDTSocket* locate(const sockaddr* peer, const UDTSOCKET id, int32_t isn);
+   CUDTSocket* locate(const sockaddr* peer, const UDTSOCKET& id, const int32_t& isn);
    void updateMux(CUDTSocket* s, const sockaddr* addr = NULL, const UDPSOCKET* = NULL);
    void updateMux(CUDTSocket* s, const CUDTSocket* ls);
 

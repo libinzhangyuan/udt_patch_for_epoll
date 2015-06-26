@@ -1,7 +1,3 @@
-version 4.11
-
-mostly bug fixes since last version.
-
 version 4.10
 
 added UDT_SNDDATA and UDT_RCVDATA options
