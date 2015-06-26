@@ -1,4 +1,7 @@
-This is a example for UDT epoll api.
+This is a patch for UDT 4.10 version.
+This patch is for UDT epoll api. Because UDT epoll api has major bug.
+
+And it is a example for UDT epoll api also.
 UDT - udt.sourceforge.net
 
 Build:
