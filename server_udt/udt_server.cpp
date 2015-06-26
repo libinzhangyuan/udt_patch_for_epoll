@@ -126,7 +126,7 @@ int UDTServer::SendMsg(const UDTSOCKET& sock, const std::string& msg)
     return 1;
 }
 
-int UDTServer::RecvMsg(const UDTSOCKET& sock)
+int UDTServer::RecvMsg(const UDTSOCKET& sock, int count_of_event)
 {
     static size_t static_good_recv_count = 0;
     static size_t static_recv_count = 0;
@@ -145,8 +145,8 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock)
         int error_code = lasterror.getErrorCode();
 
         // no data available for read.  try read after next epoll wait.
-        //if (error_code == CUDTException::EASYNCRCV)
-        //    return 1;
+        if (error_code == CUDTException::EASYNCRCV)
+            return 1;
 
         std::cout << "UDT recv: " << error_code << " " <<  lasterror.getErrorMessage() << std::endl;
 
@@ -175,7 +175,7 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock)
             static_good_recv_count++;
             if (static_recv_count % 10 == 0)
             {
-                std::cout << static_good_recv_count << '\\' << static_recv_count / 10 << "\t";
+                std::cout << count_of_event << '\\' << static_good_recv_count << '\\' << static_recv_count << "\t";
                 std::cout.flush();
                 if (static_recv_count % 100 == 0)
                     std::cout << std::endl;
@@ -217,7 +217,7 @@ void UDTServer::Run(int listen_port)
 
 	while (udt_running_) {
         std::set<UDTSOCKET> readfds;
-		int state = UDT::epoll_wait(udt_eid_, &readfds, NULL, 1, NULL, NULL);
+		int state = UDT::epoll_wait(udt_eid_, &readfds, NULL, 10, NULL, NULL);
         //std::cout << "UDT::epoll_wait return " << state << std::endl;
 		if (state > 0) {
 			for (std::set<UDTSOCKET>::iterator i = readfds.begin(); i != readfds.end(); ++i) {
@@ -247,7 +247,7 @@ void UDTServer::Run(int listen_port)
 
                 // client sock
                 {
-                    RecvMsg(cur_sock);
+                    RecvMsg(cur_sock, state);
                     if (udtbuf_recved_len_ > 0)
                     {
                         SendMsg(cur_sock, std::string(udtbuf_, udtbuf_recved_len_));
@@ -259,6 +259,10 @@ void UDTServer::Run(int listen_port)
             std::cout << "UDT epoll_wait return 0" << std::endl;
         }
 		else {
+            if (UDT::getlasterror().getErrorCode() == CUDTException::ETIMEOUT) {
+                std::cout << '.';
+                std::cout.flush();
+            }
             if (UDT::getlasterror().getErrorCode() != CUDTException::ETIMEOUT) {
                 std::cout << "UDT epoll_wait: " << UDT::getlasterror().getErrorCode() <<
                     ' ' << UDT::getlasterror().getErrorMessage() << std::endl;

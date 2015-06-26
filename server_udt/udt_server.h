@@ -10,7 +10,7 @@ public:
 private:
     int CreateListenSocket(int port);
     int SendMsg(const UDTSOCKET& sock, const std::string& msg);
-    int RecvMsg(const UDTSOCKET& sock);
+    int RecvMsg(const UDTSOCKET& sock, int count_of_event);
 
 private:
     UDTSOCKET listen_sock_;
