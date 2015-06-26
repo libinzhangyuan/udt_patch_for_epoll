@@ -260,17 +260,12 @@ void UDTServer::Run(int listen_port)
 			}
 		}
         else if (state == 0) {
-            std::cout << "UDT epoll_wait return 0" << std::endl;
+            std::cout << ".";
+            std::cout.flush();
         }
 		else {
-            if (UDT::getlasterror().getErrorCode() == CUDTException::ETIMEOUT) {
-                std::cout << '.';
-                std::cout.flush();
-            }
-            if (UDT::getlasterror().getErrorCode() != CUDTException::ETIMEOUT) {
-                std::cout << "UDT epoll_wait: " << UDT::getlasterror().getErrorCode() <<
+            std::cout << "UDT epoll_wait: " << UDT::getlasterror().getErrorCode() <<
                     ' ' << UDT::getlasterror().getErrorMessage() << std::endl;
-            }
 			if ((CUDTException::EINVPARAM == UDT::getlasterror().getErrorCode()) ||
 				(CUDTException::ECONNLOST == UDT::getlasterror().getErrorCode())) {
 				udt_running_ = 0;
