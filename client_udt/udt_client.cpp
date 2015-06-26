@@ -107,10 +107,14 @@ int UDTClient::SendMsg(const UDTSOCKET& sock, const std::string& msg)
     int send_ret = UDT::sendmsg(sock, msg.c_str(), msg.size());
     if (UDT::ERROR == send_ret)
     {
-        std::cout << "UDT sendmsg: " << UDT::getlasterror().getErrorCode() << ' ' << UDT::getlasterror().getErrorMessage() << std::endl;
-        if (UDT::getlasterror().getErrorCode() == CUDTException::ECONNLOST)
+        CUDTException& lasterror = UDT::getlasterror();
+        int error_code = lasterror.getErrorCode();
+        std::cout << "UDT sendmsg:" << error_code << ' ' << lasterror.getErrorMessage() << std::endl;
+        if (error_code == CUDTException::ECONNLOST || error_code == CUDTException::EINVSOCK)
         {
+            UDT::epoll_remove_usock(udt_eid_, sock);
             udt_running_ = 0;
+
         }
         return 0;
     }
@@ -131,10 +135,17 @@ int UDTClient::RecvMsg(const UDTSOCKET& sock)
     udtbuf_recved_len_ = 0;
 
     int recv_ret = 0;
-    if (UDT::ERROR == (recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_)))) {
-        std::cout << "UDT recv:" << UDT::getlasterror().getErrorMessage() << std::endl;
-        if ((CUDTException::EINVPARAM == UDT::getlasterror().getErrorCode()) ||
-                (CUDTException::ECONNLOST == UDT::getlasterror().getErrorCode())) {
+    if (UDT::ERROR == (recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_))))
+    {
+        CUDTException& lasterror = UDT::getlasterror();
+        int error_code = lasterror.getErrorCode();
+        std::cout << "UDT recv:" << lasterror.getErrorMessage() << std::endl;
+
+        // no data available for read.  try read after next epoll wait.
+        if (error_code == CUDTException::EASYNCRCV)
+             return 0;
+
+        if (CUDTException::EINVPARAM == error_code || CUDTException::ECONNLOST == error_code || CUDTException::EINVSOCK == error_code) {
             udt_running_ = 0;
             UDT::epoll_remove_usock(udt_eid_, sock);
         }
@@ -219,7 +230,8 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
 
     // epoll
 	udt_eid_ = UDT::epoll_create();
-	UDT::epoll_add_usock(udt_eid_, sock_);
+    int read_event = UDT_EPOLL_IN | UDT_EPOLL_ERR;
+	UDT::epoll_add_usock(udt_eid_, sock_, &read_event);
 	
 	std::cout << "Run UDT client loop ...\n";
     std::cout << "package size: " << test_str_.size() << std::endl;
@@ -231,7 +243,7 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
 	while (udt_running_) {
         std::set<UDTSOCKET> readfds, writefds;
 
-        int state = UDT::epoll_wait(udt_eid_, &readfds, &writefds, 1, NULL, NULL);
+        int state = UDT::epoll_wait(udt_eid_, &readfds, &writefds, 2, NULL, NULL);
 		if (state > 0) {
 			for (std::set<UDTSOCKET>::iterator i = readfds.begin(); i != readfds.end(); ++i)
             {
@@ -265,6 +277,10 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
                 }
             }
 		}
+        else if (state == 0) {
+            //std::cout << ".";
+            //std::cout.flush();
+        }
 		else {
 			if ((CUDTException::EINVPARAM == UDT::getlasterror().getErrorCode()) ||
 				(CUDTException::ECONNLOST == UDT::getlasterror().getErrorCode())) {
