@@ -1311,8 +1311,11 @@ int CUDT::sendmsg(const char* data, const int& len, const int& msttl, const bool
    return len;   
 }
 
-int CUDT::recvmsg(char* data, const int& len)
+int CUDT::recvmsg(char* data, const int& len, bool* pHaveMsgStill)
 {
+   if (pHaveMsgStill != NULL)
+       *pHaveMsgStill = false;
+
    if (UDT_STREAM == m_iSockType)
       throw CUDTException(5, 9, 0);
 
@@ -1334,6 +1337,11 @@ int CUDT::recvmsg(char* data, const int& len)
          // read is not available any more
          s_UDTUnited.m_EPoll.disable_read(m_SocketID, m_sPollID);
       }
+      else
+      {
+         if (pHaveMsgStill != NULL)
+            *pHaveMsgStill = true;
+      }
 
       if (0 == res)
          throw CUDTException(2, 1, 0);
@@ -1351,6 +1359,11 @@ int CUDT::recvmsg(char* data, const int& len)
       {
           // read is not available any more
           s_UDTUnited.m_EPoll.disable_read(m_SocketID, m_sPollID);
+      }
+      else
+      {
+         if (pHaveMsgStill != NULL)
+            *pHaveMsgStill = true;
       }
 
       if (0 == res)
@@ -1411,6 +1424,11 @@ int CUDT::recvmsg(char* data, const int& len)
    {
       // read is not available any more
       s_UDTUnited.m_EPoll.disable_read(m_SocketID, m_sPollID);
+   }
+   else
+   {
+       if (pHaveMsgStill != NULL)
+          *pHaveMsgStill = true;
    }
 
    if ((res <= 0) && (m_iRcvTimeOut >= 0))

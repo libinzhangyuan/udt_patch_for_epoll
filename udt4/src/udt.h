@@ -318,7 +318,7 @@ UDT_API int setsockopt(UDTSOCKET u, int level, SOCKOPT optname, const void* optv
 UDT_API int send(UDTSOCKET u, const char* buf, int len, int flags);
 UDT_API int recv(UDTSOCKET u, char* buf, int len, int flags);
 UDT_API int sendmsg(UDTSOCKET u, const char* buf, int len, int ttl = -1, bool inorder = false);
-UDT_API int recvmsg(UDTSOCKET u, char* buf, int len);
+UDT_API int recvmsg(UDTSOCKET u, char* buf, int len, bool* pHaveMsgStill = NULL);
 UDT_API int64_t sendfile(UDTSOCKET u, std::fstream& ifs, int64_t& offset, int64_t size, int block = 364000);
 UDT_API int64_t recvfile(UDTSOCKET u, std::fstream& ofs, int64_t& offset, int64_t size, int block = 7280000);
 UDT_API int select(int nfds, UDSET* readfds, UDSET* writefds, UDSET* exceptfds, const struct timeval* timeout);

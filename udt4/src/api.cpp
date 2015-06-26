@@ -1853,12 +1853,12 @@ int CUDT::sendmsg(UDTSOCKET u, const char* buf, int len, int ttl, bool inorder)
    }
 }
 
-int CUDT::recvmsg(UDTSOCKET u, char* buf, int len)
+int CUDT::recvmsg(UDTSOCKET u, char* buf, int len, bool* pHaveMsgStill)
 {
    try
    {
       CUDT* udt = s_UDTUnited.lookup(u);
-      return udt->recvmsg(buf, len);
+      return udt->recvmsg(buf, len, pHaveMsgStill);
    }
    catch (CUDTException e)
    {
@@ -2235,9 +2235,9 @@ int sendmsg(UDTSOCKET u, const char* buf, int len, int ttl, bool inorder)
    return CUDT::sendmsg(u, buf, len, ttl, inorder);
 }
 
-int recvmsg(UDTSOCKET u, char* buf, int len)
+int recvmsg(UDTSOCKET u, char* buf, int len, bool* pHaveMsgStill)
 {
-   return CUDT::recvmsg(u, buf, len);
+   return CUDT::recvmsg(u, buf, len, pHaveMsgStill);
 }
 
 int64_t sendfile(UDTSOCKET u, fstream& ifs, int64_t& offset, int64_t size, int block)

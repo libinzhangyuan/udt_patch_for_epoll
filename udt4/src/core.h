@@ -92,7 +92,7 @@ public: //API
    static int send(UDTSOCKET u, const char* buf, int len, int flags);
    static int recv(UDTSOCKET u, char* buf, int len, int flags);
    static int sendmsg(UDTSOCKET u, const char* buf, int len, int ttl = -1, bool inorder = false);
-   static int recvmsg(UDTSOCKET u, char* buf, int len);
+   static int recvmsg(UDTSOCKET u, char* buf, int len, bool* pHaveMsgStill = NULL);
    static int64_t sendfile(UDTSOCKET u, std::fstream& ifs, int64_t& offset, const int64_t& size, const int& block = 364000);
    static int64_t recvfile(UDTSOCKET u, std::fstream& ofs, int64_t& offset, const int64_t& size, const int& block = 7280000);
    static int select(int nfds, ud_set* readfds, ud_set* writefds, ud_set* exceptfds, const timeval* timeout);
@@ -207,7 +207,7 @@ private:
       // Returned value:
       //    Actual size of data received.
 
-   int recvmsg(char* data, const int& len);
+   int recvmsg(char* data, const int& len, bool* pHaveMsgStill = NULL);
 
       // Functionality:
       //    Request UDT to send out a file described as "fd", starting from "offset", with size of "size".
