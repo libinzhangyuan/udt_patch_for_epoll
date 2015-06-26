@@ -126,7 +126,7 @@ int UDTClient::SendMsg(const UDTSOCKET& sock, const std::string& msg)
     return 1;
 }
 
-int UDTClient::RecvMsg(const UDTSOCKET& sock)
+int UDTClient::RecvMsg(const UDTSOCKET& sock, bool& bHaveMsgStill)
 {
     static size_t static_good_recv_count = 0;
     static size_t static_recv_count = 0;
@@ -135,7 +135,7 @@ int UDTClient::RecvMsg(const UDTSOCKET& sock)
     udtbuf_recved_len_ = 0;
 
     int recv_ret = 0;
-    if (UDT::ERROR == (recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_))))
+    if (UDT::ERROR == (recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_), &bHaveMsgStill)))
     {
         CUDTException& lasterror = UDT::getlasterror();
         int error_code = lasterror.getErrorCode();
@@ -251,9 +251,14 @@ int UDTClient::Run(int listen_port, const std::string& ip_connect_to, int port_c
 
                 if (cur_sock == sock_)
                 {
-                    int recv_ret = RecvMsg(cur_sock);
-                    if (recv_ret == 1)
-                        SendMsg(cur_sock, test_str_);
+                    bool bHaveMsgStill = false;
+                    do
+                    {
+                        bHaveMsgStill = false;
+                        int recv_ret = RecvMsg(cur_sock, bHaveMsgStill);
+                        if (recv_ret == 1)
+                            SendMsg(cur_sock, test_str_);
+                    } while (bHaveMsgStill);
                     continue;
                 }
                 else

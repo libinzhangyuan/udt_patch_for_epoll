@@ -13,7 +13,7 @@ public:
 
 private:
     int SendMsg(const UDTSOCKET& sock, const std::string& msg);
-    int RecvMsg(const UDTSOCKET& sock);
+    int RecvMsg(const UDTSOCKET& sock, bool& bHaveMsgStill);
     int Run(int listen_port, const std::string& ip_connect_to, int port_connect_to);
     int CreateSocket(int local_port);
     int Connect(const std::string& server_ip, int server_port);
