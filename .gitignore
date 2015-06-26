@@ -30,3 +30,12 @@
 tags
 client_udt/client_udt
 server_udt/server_udt
+
+udt4/app/appclient
+udt4/app/appserver
+udt4/app/recvfile
+udt4/app/sendfile
+udt4/app/test
+udt4/app/udcat_client
+udt4/app/udcat_server
+udt4/src/udt
