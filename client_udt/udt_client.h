@@ -1,33 +1,56 @@
 #ifndef __UDT_CLIENT_H_
 #define __UDT_CLIENT_H_
 
-#include <vector>
+#include <functional>
+#include <queue>
+#include <memory>
+#include <thread>
+#include <set>
+#include "threadsafe_queue.hpp"
+
 
 typedef int UDTSOCKET;
+typedef std::function<void(const std::shared_ptr<std::string>&)> recv_callback_func_t;
+typedef std::shared_ptr<std::string> msg_ptr_t;
 
-class UDTClient
+// the UDTClient will create another thread for UDT sending and recving.
+class UDTClient : public std::enable_shared_from_this<UDTClient>
 {
 public:
-    UDTClient(int local_port, const std::string& ip_connect_to, int port_connect_to, size_t test_str_size);
-    //void SendMsg(const std::string& msg);
+    // when recv_func valid,
+    //   recv_callback_func will be called by another thread when a package recved.  recv_callback_func should be thread safe.
+    // when recv_func invalid,
+    //   packages recved will stored in queue. You should call TryRecvMsg frequently (10 milliseconds for example) to get the recved msg.
+    UDTClient(int local_port, const std::string& ip_connect_to, int port_connect_to, recv_callback_func_t recv_func = nullptr);
+    int Start(void);
+
+    void SendMsg(msg_ptr_t msg);
+    size_t SendMsgQueueSize(void);
+    std::deque<msg_ptr_t> RecvMsg(void); // todo: using move symatic
 
 private:
-    int SendMsg(const UDTSOCKET& sock, const std::string& msg);
-    int RecvMsg(const UDTSOCKET& sock, bool& bHaveMsgStill);
-    int Run(int listen_port, const std::string& ip_connect_to, int port_connect_to);
-    int CreateSocket(int local_port);
-    int Connect(const std::string& server_ip, int server_port);
+    void TrySendMsg(void);
+    void DoSendOneMsg(const std::string& msg);
+    void TryRecvMsg(const std::set<UDTSOCKET>& readfds);
+    void DoRecvMsg(const UDTSOCKET& sock, bool& bHaveMsgStill);
+    int Run(void);
+    int CreateSocket(void);
+    int Connect(void);
 
 private:
+    recv_callback_func_t recv_callback_func_;
+    threadsafe_queue< msg_ptr_t > send_msg_queue_;
+
+    int local_port_;
+    std::string ip_connect_to_;
+    int port_connect_to_;
+
+    std::thread udt_thread_;
     UDTSOCKET sock_;
     char udtbuf_[1024 * 100];
     size_t udtbuf_recved_len_;
     int udt_running_;
     int udt_eid_;
-
-    static std::string test_str_;
-    std::vector<uint64_t> recv_package_times_; // record the time of recving package for ttl testing.
-    std::vector<uint64_t> recv_package_interval_;
 };
 
 #endif
