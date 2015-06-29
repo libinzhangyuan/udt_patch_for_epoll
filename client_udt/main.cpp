@@ -6,9 +6,14 @@
 #include <thread>
 #include <chrono>
 #include <sstream>
+#include <algorithm>
 
 #include "test_util.h"
 #include "udt_client.h"
+
+std::vector<int> recv_package_interval_;
+std::vector<int> recv_package_interval10_;
+
 
 #define CLOCK_INTERVAL_STR "haha"
 msg_ptr_t make_test_str(size_t test_str_size)
@@ -37,8 +42,38 @@ void recv_func(const std::shared_ptr<std::string>& str)
     //std::cout << "recv: " << *str << std::endl;
     uint64_t send_time = get_time_from_msg(*str);
     uint64_t cur_time = iclock64();
-    std::cout << cur_time - send_time << ' ';
-    std::cout.flush();
+
+
+    {
+        static size_t static_good_recv_count = 0;
+
+        static_good_recv_count++;
+
+        uint64_t interval = cur_time - send_time;
+        recv_package_interval_.push_back(interval);
+        recv_package_interval10_.push_back(interval);
+        std::cout << interval << "\t";
+
+        if (static_good_recv_count % 10 == 0)
+        {
+            int average10 = 0;
+            for (int x : recv_package_interval10_)
+                average10 += x;
+            average10 = (average10 / 10);
+
+            int average_total = 0;
+            for (int x: recv_package_interval_)
+                average_total += x;
+            average_total = average_total / recv_package_interval_.size();
+
+            std::cout << "max: " << *std::max_element( recv_package_interval10_.begin(), recv_package_interval10_.end() ) <<
+                "  average 10: " << average10 <<
+                "  average total: " << average_total <<
+                std::endl;
+            recv_package_interval10_.clear();
+        }
+        std::cout.flush();
+    }
 }
 
 int main(int argc, char* argv[])
