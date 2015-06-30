@@ -6,6 +6,8 @@
 #include <memory>
 #include <thread>
 #include <set>
+#include <queue>
+
 #include "threadsafe_queue.hpp"
 
 
@@ -29,8 +31,15 @@ public:
     std::deque<msg_ptr_t> RecvMsg(void); // todo: using move symatic
 
 private:
-    void TrySendMsg(void);
-    void DoSendOneMsg(const std::string& msg);
+    void TryGrabMsg(void);
+
+    void TrySendMsg(const std::set<UDTSOCKET>& writefds);
+
+    // return 0 means send buf full. Need send at next epoll return.
+    // return 1 means send ok. Can send other package.
+    // return -1 means badly error. Need stop.
+    int DoSendOneMsg(const std::string& msg);
+
     void TryRecvMsg(const std::set<UDTSOCKET>& readfds);
     void DoRecvMsg(const UDTSOCKET& sock, bool& bHaveMsgStill);
     int Run(void);
@@ -40,6 +49,7 @@ private:
 private:
     recv_callback_func_t recv_callback_func_;
     threadsafe_queue< msg_ptr_t > send_msg_queue_;
+    std::queue<msg_ptr_t> send_msg_buff_;
 
     int local_port_;
     std::string ip_connect_to_;

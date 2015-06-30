@@ -74,7 +74,7 @@ int UDTClient::CreateSocket(void)
 
     // setopt
     {
-        bool block = true;  // 设置成阻塞模式, 然后容易保证写的完整性
+        bool block = false;
         UDT::setsockopt(sock_, 0, UDT_SNDSYN, &block, sizeof(bool));
         UDT::setsockopt(sock_, 0, UDT_RCVSYN, &block, sizeof(bool));
 
@@ -114,49 +114,71 @@ int UDTClient::CreateSocket(void)
 	return 0;
 }
 
-void UDTClient::TrySendMsg(void)
+void UDTClient::TryGrabMsg(void)
 {
-    //std::queue<msg_ptr_t>&& msgs_need_send = send_msg_queue_.grab_all(); // using right refrence because we want to change it.
-    std::queue<msg_ptr_t> msgs_need_send = send_msg_queue_.grab_all();
+    send_msg_buff_ = send_msg_queue_.grab_all();
+}
 
-    while (!msgs_need_send.empty())
+void UDTClient::TrySendMsg(const std::set<UDTSOCKET>& writefds)
+{
+    if (writefds.find(sock_) == writefds.end())
     {
-        msg_ptr_t msg = msgs_need_send.front();
-        msgs_need_send.pop();
+        //std::cout << "canot write" << std::endl;
+        return;
+    }
 
-        uint64_t begin_time = iclock64();
-        DoSendOneMsg(*msg);
-        uint64_t end_time = iclock64();
-        /*if (end_time - begin_time > 10)
-            std::cout << "send time too long: " << end_time - begin_time << std::endl;
-            */
-        if (end_time - begin_time > 10)
-            std::cerr << "S";
-        else
-            std::cerr << "s";
-        std::cerr.flush();
+    //std::cout << "can write" << std::endl;
+
+    while (!send_msg_buff_.empty())
+    {
+        msg_ptr_t msg = send_msg_buff_.front();
+
+        const int send_ret = DoSendOneMsg(*msg);
+        switch (send_ret)
+        {
+            case 0:
+                return; // try send_at_next_epoll_return
+            case -1:
+                return; // udt_running_ = 0;
+            case 1:
+                send_msg_buff_.pop();
+                continue;
+            default:
+                udt_running_ = 0;
+                return;
+        }
     }
 }
 
-void UDTClient::DoSendOneMsg(const std::string& msg)
+// return 0 means send buf full. Need send at next epoll return.
+// return 1 means send ok. Can send other package.
+// return -1 means badly error. Need stop.
+int UDTClient::DoSendOneMsg(const std::string& msg)
 {
     //std::cout << "UDT client DoSendMsg: " << msg << std::endl;
 
-    int send_ret = UDT::sendmsg(sock_, msg.c_str(), msg.size());
+    int send_ret = UDT::sendmsg(sock_, msg.c_str(), msg.size(), -1, true);
     if (UDT::ERROR == send_ret)
     {
-        std::cout << "UDT sendmsg: " << UDT::getlasterror().getErrorCode() << ' ' << UDT::getlasterror().getErrorMessage() << std::endl;
-        if (UDT::getlasterror().getErrorCode() == CUDTException::ECONNLOST)
+        CUDTException& lasterror = UDT::getlasterror();
+        const int error_code = lasterror.getErrorCode();
+        if (error_code == CUDTException::EASYNCSND)
         {
-            udt_running_ = 0;
+            std::cerr << "N"; std::cerr.flush();
+            return 0;
         }
-        return;
+
+        std::cout << "UDT sendmsg: " << error_code << ' ' << lasterror.getErrorMessage() << std::endl;
+        udt_running_ = 0;
+        return -1;
     }
     if (static_cast<size_t>(send_ret) != msg.size())
     {
         std::cout << "UDT sendmsg: not all msg send!" << std::endl;
-        return;
+        udt_running_ = 0;
+        return -1;
     }
+    return 1;
 }
 
 void UDTClient::DoRecvMsg(const UDTSOCKET& sock, bool& bHaveMsgStill)
@@ -238,16 +260,19 @@ int UDTClient::Run(void)
 
     // epoll
 	udt_eid_ = UDT::epoll_create();
-    int read_event = UDT_EPOLL_IN | UDT_EPOLL_ERR;
-	UDT::epoll_add_usock(udt_eid_, sock_, &read_event);
+    int event_only_read = UDT_EPOLL_IN | UDT_EPOLL_ERR;
+	UDT::epoll_add_usock(udt_eid_, sock_, &event_only_read);
+    bool b_event_only_read = true;
 	
 	std::cout << "Run UDT client loop ...\n";
 	udt_running_ = 1;
 
+    int event_with_write = UDT_EPOLL_IN | UDT_EPOLL_ERR | UDT_EPOLL_OUT;
+    std::set<UDTSOCKET> writefds;
 	while (udt_running_) {
         std::set<UDTSOCKET> readfds;
 
-        int state = UDT::epoll_wait(udt_eid_, &readfds, NULL, 1, NULL, NULL);
+        int state = UDT::epoll_wait(udt_eid_, &readfds, &writefds, 1, NULL, NULL);
         if (state < 0) {
             CUDTException& lasterror = UDT::getlasterror();
             int error_code = lasterror.getErrorCode();
@@ -260,13 +285,38 @@ int UDTClient::Run(void)
             continue;
         }
 
-        // send msg first.
         if (state == 0)
         {
             std::cerr << ".";
             std::cerr.flush();
         }
-        TrySendMsg();
+
+        if (send_msg_buff_.empty())
+            TryGrabMsg();
+
+        // add write events if there are some packages need send.
+        if (send_msg_buff_.empty())
+        {
+            if (b_event_only_read == false)
+            {
+                std::cerr << "R"; std::cerr.flush();
+                UDT::epoll_remove_usock(udt_eid_, sock_);
+                UDT::epoll_add_usock(udt_eid_, sock_, &event_only_read);
+                b_event_only_read = true;
+            }
+        }
+        else
+        {
+            if (b_event_only_read)
+            {
+                std::cerr << "A"; std::cerr.flush();
+                UDT::epoll_add_usock(udt_eid_, sock_, &event_with_write);
+                b_event_only_read = false;
+            }
+        }
+
+        // send msg first.
+        TrySendMsg(writefds);
 
 		if (state > 0) {
             // recv msg

@@ -26,3 +26,9 @@ Other notes:
          http://sourceforge.net/p/udt/discussion/852996/thread/88d8bee5/
     -- You can test 4.11 version's bug by change branch to udt4.11_with_bug )
 3 . udt4 in this project is coming from https://github.com/LabAdvComp/UDR. It fixed some bug by LabAdvComp. And I made some patch too.
+
+. - epoll_wait timeout return. means no socket prepare.
+N - send: socket is non-blocking (UDT_SNDSYN = false) but no buffer space is available.
+R - remove write event to socket
+A - add write event to socket
+B - epoll busy. sleep for stop add more msg to send buf.
