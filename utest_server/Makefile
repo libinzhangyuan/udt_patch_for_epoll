@@ -60,16 +60,15 @@ LC_OS_NAME = $(shell echo $(OS_NAME) | tr '[A-Z]' '[a-z]')
 # MAC=darwin
 # CENTOS=linux
 
+
 # The pre-processor and compiler options.
 MY_CFLAGS =
 
 # The linker options.
-#MY_LIBS   = $(BOOST_LIB_PATH)/libboost_system-mt.a $(BOOST_LIB_PATH)/libboost_filesystem-mt.a $(BOOST_LIB_PATH)/libboost_thread-mt.a $(PB_LIB_PATH)/libprotobuf.a ../essential/essential.a ../udt4/src/libudt.a
-MY_LIBS   = ../udt4/src/libudt.a
-
+MY_LIBS   = ../cppunit-1.12.1/src/cppunit/.libs/libcppunit.a ../udt4/src/libudt.a ../server_udt/server_udt.a
 
 # The pre-processor options used by the cpp (man cpp for more).
-CPPFLAGS  = -Wall -I ../udt4/src -g3
+CPPFLAGS  = -Wall -I ../cppunit-1.12.1/include -I ../server_udt -D _UTEST_ -g3
 
 # The options used in linking as well as in any direct use of ld.
 ifeq ($(LC_OS_NAME), darwin)
@@ -78,14 +77,13 @@ else
     LDFLAGS   = -L/opt/local/lib -pthread -lrt
 endif
 
-
 # The directories in which source files reside.
 # If not specified, only the current directory will be serached.
 SRCDIRS   = ./
 
 # The executable file name.
 # If not specified, current directory name or `a.out' will be used.
-PROGRAM   = server_udt.a
+PROGRAM   = utest_server
 
 ## Implicit Section: change the following only when necessary.
 ##==========================================================================
@@ -199,7 +197,13 @@ ctags: $(HEADERS) $(SOURCES)
 # Rules for generating the executable.
 #-------------------------------------
 $(PROGRAM):$(OBJS)
-	ar -cr $@ $(OBJS)
+ifeq ($(SRC_CXX),)              # C program
+	$(LINK.c)   $(OBJS) $(MY_LIBS) -o $@
+	@echo Type ./$@ to execute the program.
+else                            # C++ program
+	$(LINK.cxx) $(OBJS) $(MY_LIBS) -o $@
+	@echo Type ./$@ to execute the program.
+endif
 
 ifndef NODEP
 ifneq ($(DEPS),)

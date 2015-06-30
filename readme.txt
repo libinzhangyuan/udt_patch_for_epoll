@@ -4,17 +4,28 @@ This patch is for UDT epoll api. Because UDT epoll api has major bug.
 And it is a example for UDT epoll api also.
 UDT - udt.sourceforge.net
 
-Build:
+### Build:
 1. git clone git://git.code.sf.net/p/udt/git udt-git
 2. copy udt-git/udt4 to ./udt_epoll_emample/ folder
 3. modify the OS and ARCH in allmake.sh.
 4. run # . allmake.sh
 
 
-Run test:
+### Run test:
 server_udt/udt_server 127.0.0.1 12345
 client_udt/udt_client 22222 127.0.0.1 12345 1400
 or  sh launcher_clients.sh
+
+
+
+### Compile for cppunit test
+Install cppunit
+*   download from http://nchc.dl.sourceforge.net/project/cppunit/cppunit/1.12.1/cppunit-1.12.1.tar.gz
+        or you can use the pack in install_pack folder.
+*   unpack it. cp cppunit-1.12.1 folder to the folder of duoduo project.
+*   $ cd cppunit-1.12.1
+*   $ ./configure
+*   $ make
 
 
 

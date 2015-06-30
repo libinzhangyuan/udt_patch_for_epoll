@@ -74,7 +74,7 @@ void recv_func(const std::shared_ptr<std::string>& str)
                 "  average total: " << average_total;
             if (cur_time - static_last_refresh_time > 10 * 1000)
             {
-                std::cout << " " << static_recved_bytes * 1000 / (cur_time - static_last_refresh_time) << "bytes/s(in)";
+                std::cout << " " << static_cast<double>(static_recved_bytes * 10 / (cur_time - static_last_refresh_time)) / 10 << "KB/s(in)";
                 static_last_refresh_time = cur_time;
                 static_recved_bytes = 0;
             }
@@ -125,11 +125,12 @@ int main(int argc, char* argv[])
 
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         size_t queue_size = client->SendMsgQueueSize();
-        while (queue_size > 5)
+        while (queue_size > 2)
+        //while (true)
         {
             std::cerr << "B";
             std::cerr.flush();
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             queue_size = client->SendMsgQueueSize();
         }
     }

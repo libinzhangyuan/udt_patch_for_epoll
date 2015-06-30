@@ -13,6 +13,8 @@ const int g_IP_Version = AF_INET;
 //const int g_Socket_Type = SOCK_STREAM;
 const int g_Socket_Type = SOCK_DGRAM;
 
+static int read_event = UDT_EPOLL_IN | UDT_EPOLL_ERR;
+
 /* get system time */
 static inline void itimeofday(long *sec, long *usec)
 {
@@ -55,17 +57,16 @@ int UDTServer::CreateListenSocket(int listen_port)
 
     // setopt
     {
-        //bool block = true;  // 设置成阻塞模式, 然后容易保证写的完整性
         bool block = false;
         UDT::setsockopt(listen_sock_, 0, UDT_SNDSYN, &block, sizeof(bool));
         UDT::setsockopt(listen_sock_, 0, UDT_RCVSYN, &block, sizeof(bool));
 
-        //UDT::setsockopt(listen_sock_, 0, UDT_MSS, new int(1500), sizeof(int));
+        //UDT::setsockopt(listen_sock_, 0, UDT_MSS, new int(1500), sizeof(int)); // default is 1500
 
         int snd_buf = 93440;// 1460 * 64 = 93440
         int rcv_buf = 93440;
-        UDT::setsockopt(listen_sock_, 0, UDT_SNDBUF, &snd_buf, sizeof(int)); // use default:10MB
-        UDT::setsockopt(listen_sock_, 0, UDT_RCVBUF, &rcv_buf, sizeof(int)); // use default:10MB
+        UDT::setsockopt(listen_sock_, 0, UDT_SNDBUF, &snd_buf, sizeof(int)); // default is 10MB
+        UDT::setsockopt(listen_sock_, 0, UDT_RCVBUF, &rcv_buf, sizeof(int)); // default is 10MB
 
 
         //int fc = 4096;
@@ -102,31 +103,7 @@ int UDTServer::CreateListenSocket(int listen_port)
 	return 0;
 }
 
-int UDTServer::SendMsg(const UDTSOCKET& sock, const std::string& msg)
-{
-    //std::cout << "UDT client SendMsg: " << msg << std::endl;
-
-    int send_ret = UDT::sendmsg(sock, msg.c_str(), msg.size());
-    if (UDT::ERROR == send_ret)
-    {
-        CUDTException& lasterror = UDT::getlasterror();
-        int error_code = lasterror.getErrorCode();
-        std::cout << "UDT sendmsg:" << error_code << ' ' << lasterror.getErrorMessage() << std::endl;
-        if (error_code == CUDTException::ECONNLOST || error_code == CUDTException::EINVSOCK)
-        {
-            UDT::epoll_remove_usock(udt_eid_, sock);
-        }
-        return 0;
-    }
-    if (static_cast<size_t>(send_ret) != msg.size())
-    {
-        std::cout << "UDT sendmsg: not all msg send!  add lowwatier for send socket is a good thing" << std::endl;
-        return 0;
-    }
-    return 1;
-}
-
-int UDTServer::RecvMsg(const UDTSOCKET& sock, int count_of_event, bool& bHaveMsgStill)
+int UDTServer::RecvMsg(const UDTSOCKET& sock, bool& bHaveMsgStill)
 {
     static size_t static_good_recv_count = 0;
     static size_t static_recv_count = 0;
@@ -176,7 +153,7 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock, int count_of_event, bool& bHaveMsg
             static_good_recv_count++;
             if (static_recv_count % 10 == 0)
             {
-                std::cout << count_of_event << '\\' << static_good_recv_count << '\\' << static_recv_count << "\t";
+                std::cout << static_good_recv_count << '\\' << static_recv_count << "\t";
                 std::cout.flush();
                 if (static_recv_count % 100 == 0)
                     std::cout << std::endl;
@@ -190,6 +167,47 @@ int UDTServer::RecvMsg(const UDTSOCKET& sock, int count_of_event, bool& bHaveMsg
     return 1;
 }
 
+void UDTServer::HandleReadFds(const std::set<UDTSOCKET>& readfds)
+{
+    for (const UDTSOCKET cur_sock : readfds)
+    {
+        if (cur_sock == listen_sock_)
+        {
+            std::cout << "accept a new connection!" << std::endl;
+            sockaddr addr;
+            int addr_len;
+            UDTSOCKET new_sock = UDT::accept(listen_sock_, &addr, &addr_len);
+            if (new_sock == UDT::INVALID_SOCK)
+            {
+                std::cout << "UDT accept:" << UDT::getlasterror().getErrorCode() << ' ' << UDT::getlasterror().getErrorMessage() << std::endl;
+                continue;
+            }
+
+            // add to readfds
+            {
+                int add_usock_ret = UDT::epoll_add_usock(udt_eid_, new_sock, &read_event);
+                if (add_usock_ret < 0)
+                    std::cout << "UDT::epoll_add_usock new_sock add error: " << add_usock_ret << std::endl;
+            }
+
+            continue;
+        }
+
+        // client sock
+        {
+            bool bHaveMsgStill = false;
+            do
+            {
+                bHaveMsgStill = false;
+                RecvMsg(cur_sock, bHaveMsgStill);
+                if (udtbuf_recved_len_ > 0)
+                {
+                    send_msg_ctrl_ptr_->AddMsgToSendBuf(cur_sock, std::make_shared<std::string>(udtbuf_, udtbuf_recved_len_));
+                }
+            } while (bHaveMsgStill);
+        }
+    }
+}
 
 void UDTServer::Run(int listen_port)
 {
@@ -202,64 +220,27 @@ void UDTServer::Run(int listen_port)
 
     // epoll
 	udt_eid_ = UDT::epoll_create();
-    int read_event = UDT_EPOLL_IN | UDT_EPOLL_ERR;
 
     {
         int add_usock_ret = UDT::epoll_add_usock(udt_eid_, listen_sock_, &read_event);
         if (add_usock_ret < 0)
             std::cout << "UDT::epoll_add_usock error: " << add_usock_ret << std::endl;
     }
-	
+
+    send_msg_ctrl_ptr_.reset(new SendMsgCtrl(udt_eid_));
+
 	std::cout << "Run UDT server loop ...\n";
 	udt_running_ = 1;
 
-
-
-
 	while (udt_running_) {
         std::set<UDTSOCKET> readfds;
-		int state = UDT::epoll_wait(udt_eid_, &readfds, NULL, 10, NULL, NULL);
-        //std::cout << "UDT::epoll_wait return " << state << std::endl;
+        std::set<UDTSOCKET> writefds;
+		int state = UDT::epoll_wait(udt_eid_, &readfds, &writefds, 10, NULL, NULL);
 		if (state > 0) {
-			for (std::set<UDTSOCKET>::iterator i = readfds.begin(); i != readfds.end(); ++i) {
-                UDTSOCKET cur_sock = *i;
-
-                if (cur_sock == listen_sock_)
-                {
-                    std::cout << "accept a new connection!" << std::endl;
-                    sockaddr addr;
-                    int addr_len;
-                    UDTSOCKET new_sock = UDT::accept(listen_sock_, &addr, &addr_len);
-                    if (new_sock == UDT::INVALID_SOCK)
-                    {
-                        std::cout << "UDT accept:" << UDT::getlasterror().getErrorCode() << ' ' << UDT::getlasterror().getErrorMessage() << std::endl;
-                        continue;
-                    }
-
-                    // add to readfds
-                    {
-                        int add_usock_ret = UDT::epoll_add_usock(udt_eid_, new_sock, &read_event);
-                        if (add_usock_ret < 0)
-                            std::cout << "UDT::epoll_add_usock new_sock add error: " << add_usock_ret << std::endl;
-                    }
-
-                    continue;
-                }
-
-                // client sock
-                {
-                    bool bHaveMsgStill = false;
-                    do
-                    {
-                        bHaveMsgStill = false;
-                        RecvMsg(cur_sock, state, bHaveMsgStill);
-                        if (udtbuf_recved_len_ > 0)
-                        {
-                            SendMsg(cur_sock, std::string(udtbuf_, udtbuf_recved_len_));
-                        }
-                    } while (bHaveMsgStill);
-                }
-			}
+            // read
+            HandleReadFds(readfds);
+            // write
+            send_msg_ctrl_ptr_->TrySendMsg(writefds);
 		}
         else if (state == 0) {
             std::cout << ".";
@@ -275,6 +256,9 @@ void UDTServer::Run(int listen_port)
 			}
 		}
 	}
+
+
+    send_msg_ctrl_ptr_->CleanAll();
 
 	std::cout << "release UDT epoll ..." << std::endl;
 	int release_state = UDT::epoll_release(udt_eid_);

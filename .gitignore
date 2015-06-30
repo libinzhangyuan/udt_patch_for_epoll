@@ -29,7 +29,13 @@
 
 tags
 client_udt/client_udt
-server_udt/server_udt
+server_udt/server_udt.a
+server/server
+utest_server/utest_server
+
+install_pack
+cppunit-1.12.1
+error.log
 
 udt4/app/appclient
 udt4/app/appserver

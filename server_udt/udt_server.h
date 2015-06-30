@@ -1,6 +1,10 @@
 #ifndef __UDT_SERVER_H_
 #define __UDT_SERVER_H_
 
+#include <deque>
+
+#include "send_msg_ctrl.h"
+
 class UDTServer
 {
 public:
@@ -9,13 +13,8 @@ public:
 
 private:
     int CreateListenSocket(int port);
-    int SendMsg(const UDTSOCKET& sock, const std::string& msg);
-
-    // return 1 means recv a package.
-    //   at this situation:   bHaveMsgStill == true, means have another package need recv.
-    //                        bHaveMsgStill == false means do not have another package need recv.
-    // return 0 means do not recv a package.
-    int RecvMsg(const UDTSOCKET& sock, int count_of_event, bool& bHaveMsgStill);
+    int RecvMsg(const UDTSOCKET& sock, bool& bHaveMsgStill);
+    void HandleReadFds(const std::set<UDTSOCKET>& readfds);
 
 private:
     UDTSOCKET listen_sock_;
@@ -23,6 +22,7 @@ private:
     size_t udtbuf_recved_len_;
     int udt_running_;
     int udt_eid_;
+    std::shared_ptr<SendMsgCtrl> send_msg_ctrl_ptr_;
 };
 
 #endif

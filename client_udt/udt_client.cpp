@@ -82,7 +82,8 @@ int UDTClient::CreateSocket(void)
 
         //int snd_buf = 16000;// 8192;
         //int rcv_buf = 16000;//8192;
-        int snd_buf = 14600;// 1460 * 10
+        //int snd_buf = 7300;// 1460 * 5
+        int snd_buf = 1460 * 200;// 1460 * 5
         int rcv_buf = 93440 * 10;
         UDT::setsockopt(sock_, 0, UDT_SNDBUF, &snd_buf, sizeof(int));
         UDT::setsockopt(sock_, 0, UDT_RCVBUF, &rcv_buf, sizeof(int)); 
@@ -188,7 +189,10 @@ void UDTClient::DoRecvMsg(const UDTSOCKET& sock, bool& bHaveMsgStill)
     int recv_ret = 0;
     if (UDT::ERROR == (recv_ret = UDT::recvmsg(sock, udtbuf_, sizeof(udtbuf_), &bHaveMsgStill))) {
         CUDTException& lasterror = UDT::getlasterror();
-        int error_code = lasterror.getErrorCode();
+        const int error_code = lasterror.getErrorCode();
+
+        if (error_code == CUDTException::EASYNCRCV) // no data available for read.
+            return;
 
         std::cout << "UDT recv: " << error_code << " " << lasterror.getErrorMessage() << std::endl;
         if (CUDTException::EINVPARAM == error_code || CUDTException::ECONNLOST == error_code || CUDTException::EINVSOCK == error_code) {
