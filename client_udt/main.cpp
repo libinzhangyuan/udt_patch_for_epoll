@@ -43,6 +43,9 @@ void recv_func(const std::shared_ptr<std::string>& str)
     uint64_t send_time = get_time_from_msg(*str);
     uint64_t cur_time = iclock64();
 
+    static uint64_t static_last_refresh_time = 0;
+    static size_t static_recved_bytes = 0;
+    static_recved_bytes += str->size();
 
     {
         static size_t static_good_recv_count = 0;
@@ -68,8 +71,14 @@ void recv_func(const std::shared_ptr<std::string>& str)
 
             std::cout << "max: " << *std::max_element( recv_package_interval10_.begin(), recv_package_interval10_.end() ) <<
                 "  average 10: " << average10 <<
-                "  average total: " << average_total <<
-                std::endl;
+                "  average total: " << average_total;
+            if (cur_time - static_last_refresh_time > 10 * 1000)
+            {
+                std::cout << " " << static_recved_bytes * 1000 / (cur_time - static_last_refresh_time) << "bytes/s(in)";
+                static_last_refresh_time = cur_time;
+                static_recved_bytes = 0;
+            }
+            std::cout << std::endl;
             recv_package_interval10_.clear();
         }
         std::cout.flush();
