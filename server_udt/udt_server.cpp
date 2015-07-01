@@ -4,6 +4,8 @@
 #include <cstring>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <ctime>
+#include <sstream>
 
 
 #include "test_util.h"
@@ -32,6 +34,18 @@ static inline uint64_t iclock64(void)
     itimeofday(&s, &u);
     value = ((uint64_t)s) * 1000 + (u / 1000);
     return value;
+}
+
+
+std::string get_cur_time_str()
+{
+    time_t tmpcal_ptr = {0};
+    struct tm *tmp_ptr = NULL;
+    tmpcal_ptr = time(NULL);
+    tmp_ptr = localtime(&tmpcal_ptr);
+    std::ostringstream osstrm;
+    osstrm << tmp_ptr->tm_hour << ":" << tmp_ptr->tm_min << "." << tmp_ptr->tm_sec;
+    return osstrm.str();
 }
 
 
@@ -244,6 +258,13 @@ void UDTServer::Run(int listen_port)
 		}
         else if (state == 0) {
             std::cout << ".";
+            static time_t static_last_time = 0;
+            const time_t cur_time = std::time(NULL);
+            if (cur_time != static_last_time)
+            {
+                static_last_time = cur_time;
+                std::cout << std::endl << get_cur_time_str() << " ";
+            }
             std::cout.flush();
         }
 		else {
