@@ -11,8 +11,8 @@ echo "" && echo "" && echo "[-------------------------------]" && echo "   serve
     cd ../server_udt/ && make -e os=$OS arch=$ARCH && \
 echo "" && echo "" && echo "[-------------------------------]" && echo "   server" && echo "[-------------------------------]" && \
     cd ../server/ && make -e os=$OS arch=$ARCH && \
-echo "" && echo "" && echo "[-------------------------------]" && echo "   client_udt" && echo "[-------------------------------]" && \
-    cd ../client_udt/ && make -e os=$OS arch=$ARCH && \
+echo "" && echo "" && echo "[-------------------------------]" && echo "   client_epoll" && echo "[-------------------------------]" && \
+    cd ../client_epoll/ && make -e os=$OS arch=$ARCH && \
 echo "" && echo "" && echo "[-------------------------------]" && echo "   utest_server" && echo "[-------------------------------]" && \
     cd ../utest_server/ && make -e os=$OS arch=$ARCH && \
 echo ""

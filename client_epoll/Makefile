@@ -85,7 +85,7 @@ SRCDIRS   = ./
 
 # The executable file name.
 # If not specified, current directory name or `a.out' will be used.
-PROGRAM   = client_udt
+PROGRAM   = client_epoll
 
 ## Implicit Section: change the following only when necessary.
 ##==========================================================================

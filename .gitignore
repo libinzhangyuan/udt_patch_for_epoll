@@ -28,7 +28,8 @@
 *.app
 
 tags
-client_udt/client_udt
+client/client
+client_epoll/client_epoll
 server_udt/server_udt.a
 server/server
 utest_server/utest_server
