@@ -12,9 +12,10 @@ echo "" && echo "" && echo "[-------------------------------]" && echo "   serve
 echo "" && echo "" && echo "[-------------------------------]" && echo "   server" && echo "[-------------------------------]" && \
     cd ../server/ && make -e os=$OS arch=$ARCH && \
 echo "" && echo "" && echo "[-------------------------------]" && echo "   client_udt" && echo "[-------------------------------]" && \
-    cd ../client_udt/ && make -e os=$OS arch=$ARCH \
+    cd ../client_udt/ && make -e os=$OS arch=$ARCH && \
 echo "" && echo "" && echo "[-------------------------------]" && echo "   utest_server" && echo "[-------------------------------]" && \
-    cd ../utest_server/ && make -e os=$OS arch=$ARCH
+    cd ../utest_server/ && make -e os=$OS arch=$ARCH && \
+echo ""
 
 # restore old path.
 cd $OLD_PWD

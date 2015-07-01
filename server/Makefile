@@ -65,7 +65,7 @@ MY_CFLAGS =
 
 # The linker options.
 #MY_LIBS   = $(BOOST_LIB_PATH)/libboost_system-mt.a $(BOOST_LIB_PATH)/libboost_filesystem-mt.a $(BOOST_LIB_PATH)/libboost_thread-mt.a $(PB_LIB_PATH)/libprotobuf.a ../essential/essential.a ../udt4/src/libudt.a
-MY_LIBS   = ../udt4/src/libudt.a ../server_udt/server_udt.a
+MY_LIBS   = ../server_udt/server_udt.a ../udt4/src/libudt.a ../server_udt/server_udt.a
 
 
 # The pre-processor options used by the cpp (man cpp for more).
