@@ -37,6 +37,7 @@ utest_server/utest_server
 install_pack
 cppunit-1.12.1
 error.log
+error2.log
 
 udt4/app/appclient
 udt4/app/appserver
