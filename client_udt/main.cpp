@@ -7,6 +7,7 @@
 #include <chrono>
 #include <sstream>
 #include <algorithm>
+#include <time.h>
 
 #include "test_util.h"
 #include "udt_client.h"
@@ -35,6 +36,17 @@ uint64_t get_time_from_msg(const std::string& msg)
     }
     const std::string& time_str = msg.substr(0, pos);
     return std::atoll(time_str.c_str());
+}
+
+std::string get_cur_time_str()
+{
+    time_t tmpcal_ptr = {0};
+    struct tm *tmp_ptr = NULL;
+    tmpcal_ptr = time(NULL);
+    tmp_ptr = localtime(&tmpcal_ptr);
+    std::ostringstream osstrm;
+    osstrm << tmp_ptr->tm_hour << ":" << tmp_ptr->tm_min << "." << tmp_ptr->tm_sec;
+    return osstrm.str();
 }
 
 void recv_func(const std::shared_ptr<std::string>& str)
@@ -79,6 +91,7 @@ void recv_func(const std::shared_ptr<std::string>& str)
                 static_recved_bytes = 0;
             }
             std::cout << std::endl;
+            std::cout << get_cur_time_str() << " ";
             recv_package_interval10_.clear();
         }
         std::cout.flush();
@@ -123,14 +136,13 @@ int main(int argc, char* argv[])
         msg_ptr_t msg = make_test_str(test_str_size);
         client->SendMsg(msg);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
         size_t queue_size = client->SendMsgQueueSize();
         while (queue_size > 2)
-        //while (true)
         {
             std::cerr << "B";
             std::cerr.flush();
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
             queue_size = client->SendMsgQueueSize();
         }
     }
