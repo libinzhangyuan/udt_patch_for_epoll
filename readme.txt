@@ -9,7 +9,7 @@ And it is a bench mark test. You can see the bench mark test in bench_mark.md.
 ### Build:
 1. making gcc version >= 4.8
 2. modify the OS and ARCH in allmake.sh.
-3. run # . allmake.sh
+3. $ . allmake.sh
 
 
 ### Run test:
